@@ -83,6 +83,11 @@ def cmd_logs(name: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        from dotenv import load_dotenv, find_dotenv
+        load_dotenv(find_dotenv(usecwd=True))
+    except ImportError:
+        pass
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] in ("-h", "--help"):
         print("loom — DISCOVER->PLAN->EXECUTE->VERIFY->ITERATE loop engine")

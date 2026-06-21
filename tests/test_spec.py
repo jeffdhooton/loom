@@ -38,6 +38,19 @@ def test_judge_gate_defaults(tmp_path):
     assert s.workspace.worktree is False  # default
 
 
+def test_judge_model_must_differ_from_execute_model(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "name: x\ngoal: g\ntype: content\n"
+        "workspace:\n  repo: /tmp\n"
+        "execute:\n  model: deepseek-v4-flash\n"
+        "verify:\n  gate: judge\n  rubric: r.md\n  judge_model: deepseek-v4-flash\n"
+    )
+    import pytest
+    with pytest.raises(ValueError, match="maker != checker"):
+        load_spec(str(p))
+
+
 def test_load_spec_expands_tilde_in_path(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     spec_file = tmp_path / "s.yaml"

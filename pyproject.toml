@@ -7,6 +7,7 @@ dependencies = [
     "openai>=1.40",
     "pyyaml>=6.0",
     "rich>=13.7",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -21,3 +22,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["loom*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

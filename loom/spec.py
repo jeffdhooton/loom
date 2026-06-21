@@ -113,6 +113,8 @@ def load_spec(path: str) -> LoopSpec:
         raise ValueError("command gate requires verify.command")
     if gate == "judge" and not verify.rubric:
         raise ValueError("judge gate requires verify.rubric")
+    if gate == "judge" and verify.judge_model == execute.model:
+        raise ValueError("judge_model must differ from execute.model (maker != checker)")
 
     s_raw = raw.get("stop") or {}
     stop = StopCfg(

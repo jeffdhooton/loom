@@ -1,12 +1,12 @@
 name: brief-loop-engineering
-goal: "Write examples/out/brief.md: a tight brief on loop engineering that scores >= 0.8."
+goal: "Write out/brief.md: a tight brief on loop engineering that scores >= 0.8."
 type: content
 workspace:
   repo: ~/workspace/loom/examples
   worktree: false
 context:
   notes: |
-    Write a concise brief on "loop engineering" to examples/out/brief.md using the
+    Write a concise brief on "loop engineering" to out/brief.md using the
     write tool. You may use the web tool to pull reference material. Revise based on
     judge feedback each iteration.
 execute:
