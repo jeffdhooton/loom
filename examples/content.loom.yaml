@@ -1,0 +1,27 @@
+name: brief-loop-engineering
+goal: "Write examples/out/brief.md: a tight brief on loop engineering that scores >= 0.8."
+type: content
+workspace:
+  repo: ~/workspace/loom/examples
+  worktree: false
+context:
+  notes: |
+    Write a concise brief on "loop engineering" to examples/out/brief.md using the
+    write tool. You may use the web tool to pull reference material. Revise based on
+    judge feedback each iteration.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, write, web]
+verify:
+  gate: judge
+  judge_model: gpt-oss-20b
+  rubric: ~/workspace/loom/examples/rubric.md
+  pass_threshold: 0.8
+stop:
+  max_iters: 4
+  no_progress_after: 3
+budget:
+  max_usd: 0.50
+deliver:
+  artifact: out/brief.md
