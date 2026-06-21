@@ -67,7 +67,7 @@ class LoopSpec:
 
 
 def load_spec(path: str) -> LoopSpec:
-    raw = yaml.safe_load(Path(path).read_text()) or {}
+    raw = yaml.safe_load(Path(path).expanduser().read_text()) or {}
 
     for required in ("name", "goal", "type"):
         if not raw.get(required):
@@ -117,7 +117,7 @@ def load_spec(path: str) -> LoopSpec:
     s_raw = raw.get("stop") or {}
     stop = StopCfg(
         max_iters=int(s_raw.get("max_iters", 8)),
-        no_progress_after=s_raw.get("no_progress_after"),
+        no_progress_after=int(s_raw["no_progress_after"]) if s_raw.get("no_progress_after") is not None else None,
         on_pass=bool(s_raw.get("on_pass", True)),
     )
 

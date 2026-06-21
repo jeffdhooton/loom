@@ -36,3 +36,15 @@ def test_judge_gate_defaults(tmp_path):
     assert s.verify.judge_model == "gpt-oss-20b"
     assert s.verify.pass_threshold == 0.8
     assert s.workspace.worktree is False  # default
+
+
+def test_load_spec_expands_tilde_in_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    spec_file = tmp_path / "s.yaml"
+    spec_file.write_text(
+        "name: x\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: /tmp\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    s = load_spec("~/s.yaml")
+    assert s.name == "x"
