@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from rich.console import Console
+
+from loom.budget import Budget
+from loom.gates import GateResult
+from loom.memory import RunState
+
+
+class StreamUI:
+    def __init__(self, name: str, budget: Budget):
+        self.name = name
+        self.budget = budget
+        self.console = Console()
+
+    def _budget_str(self) -> str:
+        if self.budget.max_usd is not None:
+            return f"${self.budget.spent_usd:.2f}/${self.budget.max_usd:.2f}"
+        return f"${self.budget.spent_usd:.2f}"
+
+    def header(self, **kw) -> None:
+        self.console.rule(f"[bold]loom ▸ {self.name}[/bold]")
+
+    def stage(self, name: str, n: int, total: int) -> None:
+        warn = " [yellow](budget 80%)[/yellow]" if self.budget.warn() else ""
+        self.console.print(
+            f"[dim]iter {n}/{total} │ {self._budget_str()} │[/dim] [bold cyan]{name}[/bold cyan]{warn}")
+
+    def tool(self, name: str, args: dict) -> None:
+        preview = ", ".join(f"{k}={str(v)[:40]}" for k, v in (args or {}).items())
+        self.console.print(f"  [dim]→ {name}({preview})[/dim]")
+
+    def verify(self, result: GateResult) -> None:
+        if result.passed:
+            self.console.print("  [bold green]✓ VERIFY passed[/bold green]")
+        else:
+            score = f" (score {result.score})" if result.score is not None else ""
+            self.console.print(f"  [bold red]✗ VERIFY failed{score}[/bold red]: {result.feedback[:200]}")
+
+    def summary(self, state: RunState) -> None:
+        color = "green" if state.status == "passed" else "yellow"
+        self.console.rule(f"[{color}]{self.name}: {state.status}[/{color}]")
+        self.console.print(
+            f"iterations: {len(state.iters)} │ spent: ${state.spent_usd:.2f}")
