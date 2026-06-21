@@ -12,8 +12,6 @@ Goal: {goal}
 Context:
 {context}
 
-{history}
-
 The last verification {verdict}.
 {feedback_block}
 Produce a short, concrete plan for THIS iteration only — what to change/do next.
@@ -51,8 +49,7 @@ class Cycle:
         feedback_block = f"Failure feedback:\n{last.feedback}\n" if last and not last.passed else ""
         prompt = _PLAN_PROMPT.format(
             goal=self.spec.goal, context=context,
-            history=self.memory.context_block(), verdict=verdict,
-            feedback_block=feedback_block)
+            verdict=verdict, feedback_block=feedback_block)
         resp = self.plan_client.chat.completions.create(
             model=self.spec.execute.plan_model,
             messages=[{"role": "user", "content": prompt}],
