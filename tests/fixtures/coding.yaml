@@ -1,0 +1,23 @@
+name: demo-coding
+goal: "tests pass"
+type: coding
+workspace:
+  repo: /tmp/demo
+  worktree: true
+  branch: loom/demo
+context:
+  files: [VISION.md]
+  scry: true
+  notes: "be careful"
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, write, bash]
+verify:
+  gate: command
+  command: "pytest -q"
+stop:
+  max_iters: 5
+  no_progress_after: 2
+budget:
+  max_usd: 1.5

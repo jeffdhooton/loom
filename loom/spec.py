@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+VALID_TYPES = {"coding", "content"}
+VALID_GATES = {"command", "judge"}
+
+
+@dataclass
+class Workspace:
+    repo: Path
+    worktree: bool = False
+    branch: str | None = None
+
+
+@dataclass
+class Context:
+    files: list[str] = field(default_factory=list)
+    scry: bool = False
+    notes: str = ""
+
+
+@dataclass
+class ExecuteCfg:
+    plan_model: str = "deepseek-v4-pro"
+    model: str = "deepseek-v4-flash"
+    tools: list[str] = field(default_factory=lambda: ["read", "write", "edit", "bash"])
+
+
+@dataclass
+class VerifyCfg:
+    gate: str = "command"
+    command: str | None = None
+    judge_model: str = "gpt-oss-20b"
+    rubric: str | None = None
+    pass_threshold: float = 0.8
+
+
+@dataclass
+class StopCfg:
+    max_iters: int = 8
+    no_progress_after: int | None = None
+    on_pass: bool = True
+
+
+@dataclass
+class BudgetCfg:
+    max_usd: float | None = None
+    max_tokens: int | None = None
+
+
+@dataclass
+class LoopSpec:
+    name: str
+    goal: str
+    type: str
+    workspace: Workspace
+    context: Context
+    execute: ExecuteCfg
+    verify: VerifyCfg
+    stop: StopCfg
+    budget: BudgetCfg
+    deliver: dict = field(default_factory=dict)
+
+
+def load_spec(path: str) -> LoopSpec:
+    raw = yaml.safe_load(Path(path).read_text()) or {}
+
+    for required in ("name", "goal", "type"):
+        if not raw.get(required):
+            raise ValueError(f"spec missing required field: {required}")
+    if raw["type"] not in VALID_TYPES:
+        raise ValueError(f"type must be one of {sorted(VALID_TYPES)}")
+
+    ws_raw = raw.get("workspace") or {}
+    if not ws_raw.get("repo"):
+        raise ValueError("spec missing workspace.repo")
+    workspace = Workspace(
+        repo=Path(ws_raw["repo"]).expanduser(),
+        worktree=bool(ws_raw.get("worktree", False)),
+        branch=ws_raw.get("branch"),
+    )
+
+    ctx_raw = raw.get("context") or {}
+    context = Context(
+        files=list(ctx_raw.get("files") or []),
+        scry=bool(ctx_raw.get("scry", False)),
+        notes=ctx_raw.get("notes", ""),
+    )
+
+    ex_raw = raw.get("execute") or {}
+    execute = ExecuteCfg(
+        plan_model=ex_raw.get("plan_model", "deepseek-v4-pro"),
+        model=ex_raw.get("model", "deepseek-v4-flash"),
+        tools=list(ex_raw.get("tools") or ["read", "write", "edit", "bash"]),
+    )
+
+    v_raw = raw.get("verify") or {}
+    gate = v_raw.get("gate", "command")
+    if gate not in VALID_GATES:
+        raise ValueError(f"verify.gate must be one of {sorted(VALID_GATES)}")
+    verify = VerifyCfg(
+        gate=gate,
+        command=v_raw.get("command"),
+        judge_model=v_raw.get("judge_model", "gpt-oss-20b"),
+        rubric=v_raw.get("rubric"),
+        pass_threshold=float(v_raw.get("pass_threshold", 0.8)),
+    )
+    if gate == "command" and not verify.command:
+        raise ValueError("command gate requires verify.command")
+    if gate == "judge" and not verify.rubric:
+        raise ValueError("judge gate requires verify.rubric")
+
+    s_raw = raw.get("stop") or {}
+    stop = StopCfg(
+        max_iters=int(s_raw.get("max_iters", 8)),
+        no_progress_after=s_raw.get("no_progress_after"),
+        on_pass=bool(s_raw.get("on_pass", True)),
+    )
+
+    b_raw = raw.get("budget") or {}
+    budget = BudgetCfg(
+        max_usd=b_raw.get("max_usd"),
+        max_tokens=b_raw.get("max_tokens"),
+    )
+
+    return LoopSpec(
+        name=raw["name"], goal=raw["goal"], type=raw["type"],
+        workspace=workspace, context=context, execute=execute,
+        verify=verify, stop=stop, budget=budget, deliver=raw.get("deliver") or {},
+    )
