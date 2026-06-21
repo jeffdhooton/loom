@@ -1,0 +1,22 @@
+name: sandbox-fix-add
+goal: "`pytest -q` passes in the sandbox repo."
+type: coding
+workspace:
+  repo: ~/workspace/loom/examples/sandbox
+  worktree: true
+  branch: loom/fix-add
+context:
+  notes: |
+    calc.py has a bug in add(). Fix it so the test passes. Use bash to run pytest.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, edit, bash, search]
+verify:
+  gate: command
+  command: "pytest -q"
+stop:
+  max_iters: 5
+  no_progress_after: 3
+budget:
+  max_usd: 0.50
