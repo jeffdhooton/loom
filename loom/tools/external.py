@@ -20,6 +20,8 @@ def _scry(args: dict, ctx: ToolContext) -> str:
 
 def _web(args: dict, ctx: ToolContext) -> str:
     target = args.get("url") or args.get("query")
+    if not target:
+        return "[web: url or query required]"
     try:
         proc = subprocess.run(
             ["trawl", "scrape", target, "--format", "markdown"],

@@ -37,3 +37,8 @@ def test_scry_graceful_when_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(ext.subprocess, "run", boom)
     out = reg_map(["scry"])["scry"].run({"query": "Foo::bar"}, ToolContext(cwd=tmp_path))
     assert "unavailable" in out.lower()
+
+
+def test_web_requires_target(tmp_path):
+    out = reg_map(["web"])["web"].run({}, ToolContext(cwd=tmp_path))
+    assert "required" in out.lower()
