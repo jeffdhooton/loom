@@ -51,7 +51,7 @@ class DeepSeekExecutor(Executor):
             # (DeepSeek reasoning models require it for tool-call continuations).
             assistant_msg = {
                 "role": "assistant",
-                "content": msg.content or "",
+                "content": msg.content,
                 "tool_calls": [
                     {"id": tc.id, "type": "function",
                      "function": {"name": tc.function.name,
