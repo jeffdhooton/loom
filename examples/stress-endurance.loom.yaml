@@ -1,0 +1,26 @@
+name: stress-endurance-giveup
+goal: "`pytest -q` passes (all tests green) in the endurance sandbox repo."
+type: coding
+workspace:
+  repo: ~/workspace/loom/examples/stress-endurance-sandbox
+  worktree: true
+  branch: loom/stress-endurance
+context:
+  notes: |
+    mathlib.py has the same independent bugs as the coding sandbox. Run `pytest -q`,
+    fix the bugs in mathlib.py (do NOT edit the tests), and re-run until all pass.
+    NOTE: this sandbox also contains test_endurance_bonus.py, which is intentionally
+    unsatisfiable. Fix every bug you legitimately can; the suite is not expected to go
+    fully green. Use bash to run pytest and search/read to inspect the code.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, edit, bash, search]
+verify:
+  gate: command
+  command: "pytest -q"
+stop:
+  max_iters: 20
+  no_progress_after: 6
+budget:
+  max_usd: 0.50
