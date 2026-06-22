@@ -4,6 +4,19 @@
 **Status:** approved, built, run live
 **Repo:** `~/workspace/loom`
 
+## Stage 4 (added after the first sweep)
+
+The first sweep showed Stages 1/2/2b one-shotting, so the outer loop never iterated
+*convergently*. Stage 4 closes that gap: a **hidden-oracle feature build**. The agent
+implements `romans.py` from a prose contract with **no `bash`** (can't run anything) and
+**cannot read the acceptance suite** (`examples/stress/hidden/test_romans.py` lives
+outside the worktree and is run by the command gate via `PYTHONPATH=. pytest <abs path>`).
+Its first attempt misses edge cases; the gate's failing-test names are the only signal,
+so the loop iterates and self-corrects. Live result: **passed in 2 iterations** ($0.03) —
+iter 1 failed `from_roman('MCMXCIV')` among others, iter 2 fixed it → 62/62. This is the
+canonical recipe for stressing multi-iteration self-correction: hide the oracle + deny
+the executor the ability to run it.
+
 ## Headline result
 
 Stages 1, 2, and 2b all **passed in a single iteration** — DeepSeek-v4 one-shots small,
