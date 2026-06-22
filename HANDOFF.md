@@ -156,13 +156,16 @@ in `examples/stress/` (mutable working dirs gitignored, recreate with
 | 2 coding (markers+bash) | passed | 1 | $0.00 | one-shot |
 | 2b coding (blind, no bash) | passed | 1 | $0.01 | one-shot **even blind** |
 | 3 endurance (unsatisfiable) | stopped | 6 →12 resume | $0.06 | graceful no_progress stop, exact accounting |
+| 4 hidden-oracle feature build | passed | **2** | $0.03 | **genuine self-correction** — iter1 missed an edge case, gate leaked it, iter2 fixed |
 
 **Headline finding:** loom's **outer loop only iterates when one EXECUTE pass can't
 finish/verify the task.** EXECUTE is itself a full agentic tool-loop, so DeepSeek-v4
-one-shots small well-specified tasks — even denied `bash` (2b). Reliable multi-iteration
-self-correction needs a target the executor can't complete/verify in one pass (Stage 3),
-not merely a "hard but small" one. Stage 1 confirms the two-layer judge gate is no longer
-a false-positive risk (the original pending validation).
+one-shots small well-specified tasks — even denied `bash` (2b). To stress *convergent*
+multi-iteration self-correction (Stage 4): **hide the acceptance oracle** (test outside
+the worktree, run by the gate via `PYTHONPATH=. pytest <abs path>`) **and deny `bash`** —
+the agent's first attempt misses edge cases, the gate leaks them, it self-corrects.
+Stage 3 (unsatisfiable) covers the give-up path. Stage 1 confirms the two-layer judge
+gate is no longer a false-positive risk (the original pending validation).
 
 **Rough edge found:** `loom resume` restarts iteration numbering (spine showed n=1..6,1..6
 not 1..12); spine + budget totals intact. Candidate fix: seed `n` from `len(existing_iters)`.

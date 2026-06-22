@@ -42,4 +42,15 @@ init_sandbox "$EXAMPLES_DIR/stress-blind-sandbox" mathlib_blind.py
 # Stage 3 — endurance: same bugs + one unsatisfiable bonus test.
 init_sandbox "$EXAMPLES_DIR/stress-endurance-sandbox" mathlib_buggy.py test_endurance_bonus.py
 
+# Stage 4 — hidden-oracle feature build: ship ONLY the stub into the sandbox; the
+# acceptance suite stays in examples/stress/hidden/ (unreadable to the agent) and is
+# run by the gate. Forces multi-iteration self-correction off gate feedback alone.
+feat_dir="$EXAMPLES_DIR/stress-feature-sandbox"
+rm -rf "$feat_dir"; mkdir -p "$feat_dir"
+cp "$SEED_DIR/romans_stub.py" "$feat_dir/romans.py"
+git -C "$feat_dir" init -q
+git -C "$feat_dir" add -A
+git -C "$feat_dir" -c user.email=loom@local -c user.name=loom commit -q -m "stress feature sandbox: romans stub"
+echo "  ✓ $feat_dir ($(git -C "$feat_dir" rev-parse --short HEAD)) — hidden oracle NOT copied in"
+
 echo "Done. Now run the sweep (see examples/stress/README.md)."

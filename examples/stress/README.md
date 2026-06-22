@@ -14,6 +14,8 @@ here is engineered to *fail first and converge over multiple iterations*.
 | `test_endurance_bonus.py` | one **intentionally unsatisfiable** test (Stage 3 only) |
 | `brief_seed.md` | a bloated **~680-word** fluff draft (Stage 1 starting state) |
 | `content_rubric.md` | subjective-quality rubric for the judge gate |
+| `romans_stub.py` | NotImplementedError stub the Stage 4 agent must implement |
+| `hidden/test_romans.py` | **hidden acceptance oracle** (Stage 4) — agent can't read or run it |
 | `setup.sh` | bootstraps the gitignored working dirs from these seeds |
 
 The mutated working dirs (`stress-out/`, `stress-sandbox/`, `stress-endurance-sandbox/`)
@@ -39,6 +41,9 @@ loom run examples/stress-coding-blind.loom.yaml --fresh
 loom run examples/stress-endurance.loom.yaml --fresh
 loom resume examples/stress-endurance.loom.yaml        # demonstrate resume mid-spine
 
+# Stage 4 — multi-iter self-correction via a HIDDEN oracle (no bash, can't read tests).
+loom run examples/stress-feature-hidden.loom.yaml --fresh
+
 loom ls                                                # statuses + spend
 loom logs stress-coding-multibug                       # read the memory spine
 ```
@@ -54,6 +59,11 @@ loom logs stress-coding-multibug                       # read the memory spine
   *gracefully* (no_progress / max_iters) over a long spine and reports honestly —
   with accurate cumulative budget accounting — instead of spinning forever or faking
   success. `loom resume` continues the same spine.
+- **Stage 4** — the executor cannot self-verify (no `bash`) and cannot read the
+  acceptance suite (it lives outside the worktree, run by the gate). Its first
+  implementation misses edge cases; the gate's failing-test output is the only signal,
+  so the outer loop **iterates and self-corrects** to a fully passing module. This is
+  the stage that exercises genuine multi-iteration convergence (vs. Stage 3's give-up).
 
 ## Findings (live run, 2026-06-22, DeepSeek-v4 + ollama qwen3.6:27b)
 
@@ -63,14 +73,18 @@ loom logs stress-coding-multibug                       # read the memory spine
 | 2 coding | passed | 1 | $0.00 | one-shot: used bug-marker comments + ran pytest via bash |
 | 2b blind | passed | 1 | $0.01 | one-shot **even blind** — `flash` fixed all 6 from static reasoning |
 | 3 endurance | stopped | 6 (→12 on resume) | $0.06 | graceful give-up at no_progress; honest "stopped"; budget accounting exact |
+| 4 hidden-oracle | passed | **2** | $0.03 | **genuine self-correction**: iter 1 missed `from_roman('MCMXCIV')`; gate leaked it; iter 2 fixed → 62/62 |
 
 **The headline finding:** loom's **outer loop only iterates when a single EXECUTE pass
-cannot finish the task**. Because EXECUTE is itself a full agentic tool-loop, a capable
-model (DeepSeek-v4) one-shots small, well-specified tasks — *even when denied `bash`*
-(Stage 2b). The outer DISCOVER→PLAN→EXECUTE→VERIFY→ITERATE cycle reliably engages only
-when VERIFY is genuinely unsatisfiable in one pass (Stage 3) or the task exceeds one
-pass. To stress *multi-iteration self-correction* specifically, you need a target the
-executor cannot complete or verify in a single pass — not merely a "hard" small task.
+cannot finish *or verify* the task**. Because EXECUTE is itself a full agentic tool-loop,
+a capable model (DeepSeek-v4) one-shots small, well-specified tasks — *even when denied
+`bash`* (Stage 2b). The outer DISCOVER→PLAN→EXECUTE→VERIFY→ITERATE cycle reliably engages
+only when VERIFY is unsatisfiable in one pass (Stage 3, give-up) or the executor **cannot
+self-verify** — denied a shell *and* unable to read the acceptance oracle (Stage 4,
+convergent self-correction). Stage 4 is the recipe for stressing multi-iteration
+self-correction: hide the oracle and remove the executor's ability to run it. Notably the
+Stage 4 agent *tried* to build its own test harness and *tried* to read the hidden test —
+both denied — which is precisely what forced it onto the gate's feedback.
 
 **Rough edge:** `loom resume` restarts iteration numbering (spine showed n = 1..6, 1..6
 rather than 1..12). The spine and budget totals are intact; only the per-iter `n` label

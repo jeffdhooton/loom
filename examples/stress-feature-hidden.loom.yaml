@@ -1,0 +1,38 @@
+name: stress-feature-hidden
+goal: "Implement romans.py so the hidden acceptance suite passes (`pytest` exit 0)."
+type: coding
+workspace:
+  repo: ~/workspace/loom/examples/stress-feature-sandbox
+  worktree: true
+  branch: loom/stress-feature
+context:
+  notes: |
+    Implement the three functions in romans.py (currently NotImplementedError stubs).
+    You have NO shell — you cannot run the tests. A hidden acceptance suite you cannot
+    read grades the module; after each iteration the verifier returns its failing-test
+    output. Use that feedback to fix remaining cases until everything passes.
+
+    Behavioral contract:
+    - to_roman(n): for integers 1..3999 return the CANONICAL Roman numeral (uppercase,
+      subtractive form: 4=IV, 9=IX, 40=XL, 90=XC, 400=CD, 900=CM). Raise ValueError for
+      n outside 1..3999. Non-integers (floats, str, None) — and bool — must raise
+      ValueError or TypeError.
+    - from_roman(s): parse a STRICTLY VALID canonical uppercase Roman numeral and return
+      its integer value. Raise ValueError on anything invalid: empty string, illegal
+      repetition (IIII, VV, MMMM), illegal subtractive pairs or ordering (IL, IC, XM,
+      VX, IIV), lowercase, non-Roman characters, whitespace, or any non-canonical string
+      (IVI, MCMC). Only strings whose canonical re-encoding round-trips are accepted.
+    - is_valid(s): return True if from_roman(s) would succeed, else False (never raises).
+    - Round-trip: from_roman(to_roman(n)) == n for every n in 1..3999.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, write, edit, search]
+verify:
+  gate: command
+  command: "PYTHONPATH=. pytest ~/workspace/loom/examples/stress/hidden/test_romans.py -q"
+stop:
+  max_iters: 8
+  no_progress_after: 4
+budget:
+  max_usd: 1.00
