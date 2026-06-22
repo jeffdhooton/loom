@@ -45,7 +45,8 @@ loom/
   gates/
     __init__.py   Gate ABC, GateResult, build_gate(spec, judge_client)
     command.py    CommandGate — runs shell cmd in cwd; passed = exit 0
-    judge.py      JudgeGate — LLM rubric scoring; passed = score>=threshold; tolerant JSON parse; extra_body support
+    checks.py     run_checks() — deterministic objective gates (max_words, min_words, must_contain, must_not_contain, matches)
+    judge.py      JudgeGate — TWO-LAYER: (1) deterministic checks fail-fast (no LLM call); (2) structured per-criterion LLM judge. passed = checks pass AND score>=threshold AND no self-reported failed criterion
   cycle.py        Cycle.run(cwd) — the 5-stage state machine + stop conditions
   ui.py           StreamUI — rich streaming for tmux (stage/tool/verify/header/summary)
   clients.py      make_deepseek_client (api.deepseek.com), make_judge_client (ollama/OMLX/deepseek)
@@ -81,9 +82,19 @@ Run state lives in `~/.loom/runs/<name>/{state.json, log.md}` (override root wit
 | Run | Status | Iters | Cost | Notes |
 |---|---|---|---|---|
 | `sandbox-fix-add` (coding) | ✅ passed | 1 | $0.0017 | DeepSeek read calc.py, edited the `a-b`→`a+b` bug, ran pytest, command gate green |
-| `brief-loop-engineering` (content) | ✅ passed, score 1.0 | 1 | $0.0234 | DeepSeek-flash wrote `examples/out/brief.md`; ollama qwen3.6:27b judged it 1.0 against rubric (maker≠checker) |
+| `brief-loop-engineering` (content) | ⚠️ passed score 1.0, but FALSE POSITIVE | 1 | $0.0234 | see judge-hardening note below |
 
 Usage capture confirmed correct (real per-iter $ recorded). The cost-efficiency thesis holds: a full verified loop for fractions of a cent.
+
+### Judge hardening (commit `ab9b1cc`) — important lesson
+
+The content loop's first "pass" was a **false positive**: the brief was **664 words** but the rubric says "Under 400 words", and the local `qwen3.6:27b` judge gave it 1.0 *and fabricated* "stays well under 400 words". LLM judges cannot be trusted on objective, checkable criteria.
+
+Fix shipped: the judge gate is now **two-layer** —
+1. **Deterministic `checks:`** (in the spec's `verify` block) enforce objective criteria in code, fail-fast before any LLM call. `examples/content.loom.yaml` now has `checks: [- max_words: 400]`, so the 664-word draft would now correctly FAIL and force a revision.
+2. **Structured LLM judge** returns per-criterion `{name, pass, evidence}` + score; a self-reported failed criterion overrides a high score.
+
+**Takeaway for future judge-gate loops:** put every objective/countable criterion in `checks:`; reserve the LLM judge for genuinely subjective quality. Command-gate (coding) loops were always trustworthy (deterministic exit code). **Re-running the content loop live to confirm it now self-corrects (664→revise→<400→pass) is still pending — a good first thing to verify next session.**
 
 ---
 
