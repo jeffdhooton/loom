@@ -1,8 +1,20 @@
 # loom stress-test sweep — design
 
 **Date:** 2026-06-22
-**Status:** approved, built
+**Status:** approved, built, run live
 **Repo:** `~/workspace/loom`
+
+## Headline result
+
+Stages 1, 2, and 2b all **passed in a single iteration** — DeepSeek-v4 one-shots small,
+well-specified tasks even when denied `bash` (Stage 2b, blind). The outer loop reliably
+iterates only when a single EXECUTE pass cannot finish/verify the task: **Stage 3**
+(unsatisfiable target) ran 6 iterations and stopped *gracefully* at the no_progress
+threshold (→12 on resume), with exact budget accounting ($0.06). Lesson: to stress
+multi-iteration self-correction you need a target the executor cannot complete in one
+agentic pass — "hard but small" is not enough, because EXECUTE is itself a tool-loop.
+Added Stage 2b (blind, no `bash`, no bug-marker comments) to test the self-verification
+hypothesis directly. See `examples/stress/README.md` for the full findings table.
 
 ## Problem
 

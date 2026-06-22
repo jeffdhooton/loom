@@ -10,10 +10,10 @@ SEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXAMPLES_DIR="$(cd "$SEED_DIR/.." && pwd)"
 
 init_sandbox() {
-  local dir="$1"; shift
+  local dir="$1"; local seed="$2"; shift 2
   rm -rf "$dir"
   mkdir -p "$dir"
-  cp "$SEED_DIR/mathlib_buggy.py" "$dir/mathlib.py"
+  cp "$SEED_DIR/$seed" "$dir/mathlib.py"
   cp "$SEED_DIR/test_mathlib.py" "$dir/test_mathlib.py"
   for extra in "$@"; do
     cp "$SEED_DIR/$extra" "$dir/$extra"
@@ -32,10 +32,14 @@ mkdir -p "$EXAMPLES_DIR/stress-out"
 cp "$SEED_DIR/brief_seed.md" "$EXAMPLES_DIR/stress-out/brief.md"
 echo "  ✓ stress-out/brief.md ($(wc -w < "$EXAMPLES_DIR/stress-out/brief.md") words)"
 
-# Stage 2 — coding: multi-bug sandbox (reachable target).
-init_sandbox "$EXAMPLES_DIR/stress-sandbox"
+# Stage 2 — coding: multi-bug sandbox (reachable target, markers + bash).
+init_sandbox "$EXAMPLES_DIR/stress-sandbox" mathlib_buggy.py
+
+# Stage 2b — blind: same bugs, NO markers; executor denied bash. Forces the outer
+# loop to iterate off the VERIFY gate's failing-test feedback.
+init_sandbox "$EXAMPLES_DIR/stress-blind-sandbox" mathlib_blind.py
 
 # Stage 3 — endurance: same bugs + one unsatisfiable bonus test.
-init_sandbox "$EXAMPLES_DIR/stress-endurance-sandbox" test_endurance_bonus.py
+init_sandbox "$EXAMPLES_DIR/stress-endurance-sandbox" mathlib_buggy.py test_endurance_bonus.py
 
 echo "Done. Now run the sweep (see examples/stress/README.md)."
