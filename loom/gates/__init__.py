@@ -31,4 +31,5 @@ def build_gate(spec, judge_client=None) -> Gate:
     extra_body = None if judge_model.startswith("deepseek") else {"reasoning_effort": "none"}
     return JudgeGate(client=judge_client, model=judge_model,
                      rubric_text=rubric_text, threshold=spec.verify.pass_threshold,
-                     artifact=artifact, extra_body=extra_body)
+                     artifact=artifact, extra_body=extra_body,
+                     checks=spec.verify.checks)

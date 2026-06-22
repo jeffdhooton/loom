@@ -88,3 +88,43 @@ def test_build_gate_deepseek_judge_no_extra_body(tmp_path):
     spec = load_spec(str(spec_file))
     gate = build_gate(spec, judge_client=object())
     assert gate.extra_body is None
+
+
+def test_judge_gate_fails_fast_on_deterministic_check(tmp_path):
+    # 664-word artifact must fail max_words BEFORE any LLM call.
+    artifact = tmp_path / "brief.md"
+    artifact.write_text(" ".join(["word"] * 664))
+
+    class ExplodingClient:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    raise AssertionError("LLM should not be called when checks fail")
+
+    from loom.gates.judge import JudgeGate
+    g = JudgeGate(client=ExplodingClient(), model="qwen3.6:27b", rubric_text="r",
+                  threshold=0.8, artifact=str(artifact), checks=[{"max_words": 400}])
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert r.passed is False
+    assert "max_words" in r.feedback and "664" in r.feedback
+
+
+def test_judge_gate_structured_criteria_can_fail_high_score(tmp_path):
+    from types import SimpleNamespace
+    from loom.gates.judge import JudgeGate
+    artifact = tmp_path / "a.md"
+    artifact.write_text("short enough")
+
+    def fake_create(**kw):
+        content = ('{"criteria":[{"name":"under 400 words","pass":false,"evidence":"700 words"}],'
+                   '"score":0.95,"feedback":"too long"}')
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+                               usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1))
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create)))
+    g = JudgeGate(client=client, model="qwen3.6:27b", rubric_text="r",
+                  threshold=0.8, artifact=str(artifact))  # no deterministic checks
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert r.passed is False  # a self-reported failed criterion overrides the high score
+    assert "under 400 words" in r.feedback

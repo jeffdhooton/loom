@@ -18,6 +18,8 @@ verify:
   judge_model: qwen3.6:27b
   rubric: ~/workspace/loom/examples/rubric.md
   pass_threshold: 0.8
+  checks:
+    - max_words: 400
 stop:
   max_iters: 4
   no_progress_after: 3

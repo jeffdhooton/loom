@@ -37,6 +37,7 @@ class VerifyCfg:
     judge_model: str = "gpt-oss-20b"
     rubric: str | None = None
     pass_threshold: float = 0.8
+    checks: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -108,6 +109,7 @@ def load_spec(path: str) -> LoopSpec:
         judge_model=v_raw.get("judge_model", "gpt-oss-20b"),
         rubric=v_raw.get("rubric"),
         pass_threshold=float(v_raw.get("pass_threshold", 0.8)),
+        checks=list(v_raw.get("checks") or []),
     )
     if gate == "command" and not verify.command:
         raise ValueError("command gate requires verify.command")
