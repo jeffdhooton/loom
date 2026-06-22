@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 examples/sandbox/
 examples/out/
+examples/stress-out/
+examples/stress-sandbox/
+examples/stress-blind-sandbox/
+examples/stress-endurance-sandbox/

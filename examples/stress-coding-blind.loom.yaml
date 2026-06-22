@@ -1,0 +1,27 @@
+name: stress-coding-blind
+goal: "`pytest -q` passes (all tests green) in the blind sandbox repo."
+type: coding
+workspace:
+  repo: ~/workspace/loom/examples/stress-blind-sandbox
+  worktree: true
+  branch: loom/stress-blind
+context:
+  notes: |
+    mathlib.py contains several independent bugs across add, is_even, factorial,
+    gcd, clamp, and mean. test_mathlib.py is a comprehensive, fully-satisfiable
+    suite. You do NOT have a shell — you cannot run pytest yourself. Read mathlib.py
+    and test_mathlib.py, reason about what each test expects, and fix mathlib.py
+    (do NOT edit the tests). After each iteration the verifier runs `pytest -q` and
+    returns the failing-test output as feedback; use it to fix the remaining bugs.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, edit, search]
+verify:
+  gate: command
+  command: "pytest -q"
+stop:
+  max_iters: 10
+  no_progress_after: 4
+budget:
+  max_usd: 1.00

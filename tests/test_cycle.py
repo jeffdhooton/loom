@@ -87,6 +87,19 @@ def test_cycle_stops_on_budget(tmp_path):
     assert state.status == "budget_exhausted"
 
 
+def test_cycle_resume_continues_iter_numbering(tmp_path):
+    # A resume (second run on the same memory) must continue the iteration labels
+    # rather than restarting at 1 — so the spine reads 1,2,3,4 not 1,2,1,2.
+    spec = _spec(tmp_path, max_iters=2)
+    mem = Memory("t", root=tmp_path / "r")
+    Cycle(spec, FakeExecutor(), FakeGate(pass_on_iter=99), mem,
+          Budget(10.0, None, PRICING), StubUI(), _plan_client()).run(cwd=tmp_path)
+    Cycle(spec, FakeExecutor(), FakeGate(pass_on_iter=99), mem,
+          Budget(10.0, None, PRICING), StubUI(), _plan_client()).run(cwd=tmp_path)
+    state = mem.load()
+    assert [r.n for r in state.iters] == [1, 2, 3, 4]
+
+
 def test_cycle_no_progress_bailout(tmp_path):
     spec = _spec(tmp_path, max_iters=99, no_progress=3)
     cyc = Cycle(spec, FakeExecutor(), FakeGate(pass_on_iter=99),

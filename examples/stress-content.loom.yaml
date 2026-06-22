@@ -1,0 +1,35 @@
+name: stress-content-selfcorrect
+goal: "Revise brief.md into a tight brief on loop engineering: 220-320 words, judge score >= 0.8."
+type: content
+workspace:
+  repo: ~/workspace/loom/examples/stress-out
+  worktree: false
+context:
+  files: [brief.md]
+  notes: |
+    brief.md ALREADY EXISTS and is a bloated ~680-word draft full of marketing
+    fluff. Read it first, then REVISE it in place with the write tool. It must end up
+    between 220 and 320 words, state the core idea of loop engineering in the first
+    paragraph, make at least 3 concrete technical points, cut ALL hype/buzzwords, and
+    finish with one actionable takeaway. Revise based on judge + check feedback each
+    iteration until it passes.
+execute:
+  plan_model: deepseek-v4-pro
+  model: deepseek-v4-flash
+  tools: [read, write]
+verify:
+  gate: judge
+  judge_model: qwen3.6:27b
+  rubric: ~/workspace/loom/examples/stress/content_rubric.md
+  pass_threshold: 0.8
+  checks:
+    - max_words: 320
+    - min_words: 220
+    - must_not_contain: ["game-changing", "revolutionary", "paradigm shift", "best-in-class"]
+stop:
+  max_iters: 6
+  no_progress_after: 4
+budget:
+  max_usd: 0.50
+deliver:
+  artifact: brief.md
