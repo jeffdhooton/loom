@@ -5,7 +5,7 @@ import os
 from openai import OpenAI
 
 DEEPSEEK_BASE = "https://api.deepseek.com"
-OMLX_BASE = "http://127.0.0.1:8000/v1"
+OLLAMA_BASE = "http://localhost:11434/v1"
 
 
 def make_deepseek_client() -> OpenAI:
@@ -15,8 +15,9 @@ def make_deepseek_client() -> OpenAI:
     return OpenAI(base_url=DEEPSEEK_BASE, api_key=key)
 
 
-def make_judge_client(model: str) -> OpenAI:
-    # local OMLX models are free and keyless; DeepSeek judge models reuse the main client
+def make_judge_client(model: str):
+    # local OMLX/ollama models are free and keyless; DeepSeek judge models reuse the main client
     if model.startswith("deepseek"):
         return make_deepseek_client()
-    return OpenAI(base_url=OMLX_BASE, api_key="local")
+    base = os.environ.get("LOOM_JUDGE_BASE_URL", OLLAMA_BASE)
+    return OpenAI(base_url=base, api_key="local")

@@ -19,12 +19,13 @@ ARTIFACT:
 
 class JudgeGate(Gate):
     def __init__(self, client, model: str, rubric_text: str, threshold: float,
-                 artifact: str | None):
+                 artifact: str | None, extra_body: dict | None = None):
         self.client = client
         self.model = model
         self.rubric_text = rubric_text
         self.threshold = threshold
         self.artifact = artifact
+        self.extra_body = extra_body
 
     def verify(self, cwd: Path, on_event: Callable) -> GateResult:
         on_event({"kind": "verify_start", "judge": self.model})
@@ -33,10 +34,13 @@ class JudgeGate(Gate):
             path = cwd / path
         text = path.read_text() if path and path.exists() else "[no artifact produced]"
         prompt = _PROMPT.format(rubric=self.rubric_text, artifact=text[:20000])
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        kwargs = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self.extra_body:
+            kwargs["extra_body"] = self.extra_body
+        resp = self.client.chat.completions.create(**kwargs)
         content = resp.choices[0].message.content or "{}"
         try:
             data = json.loads(content[content.find("{"): content.rfind("}") + 1])

@@ -14,9 +14,11 @@ class StreamUI:
         self.console = Console()
 
     def _budget_str(self) -> str:
+        spent = self.budget.spent_usd
+        s = f"${spent:.4f}" if spent < 1 else f"${spent:.2f}"
         if self.budget.max_usd is not None:
-            return f"${self.budget.spent_usd:.2f}/${self.budget.max_usd:.2f}"
-        return f"${self.budget.spent_usd:.2f}"
+            return f"{s}/${self.budget.max_usd:.2f}"
+        return s
 
     def header(self, **kw) -> None:
         self.console.rule(f"[bold]loom ▸ {self.name}[/bold]")

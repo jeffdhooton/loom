@@ -84,7 +84,7 @@ class Cycle:
             self.ui.stage("EXECUTE", n, self.spec.stop.max_iters)
             result = self.executor.execute(
                 system=_EXEC_SYSTEM.format(goal=self.spec.goal),
-                task=f"Plan for this iteration:\n{plan}",
+                task=f"Working directory (all paths are relative to here): {cwd}\nPlan for this iteration:\n{plan}",
                 tools=tools, model=self.spec.execute.model, cwd=cwd,
                 on_event=lambda e: self.ui.tool(e.data.get("name", ""), e.data.get("args", {}))
                 if e.kind == "tool" else None,

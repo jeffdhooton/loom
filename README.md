@@ -46,6 +46,10 @@ a budget cap.
 `examples/content.loom.yaml` shows a content loop where a judge model scores
 the output against a rubric and iterates until the score meets the threshold.
 
+## Local judge (content loops)
+
+Content loops use a local LLM judge via ollama at `http://localhost:11434/v1` (OpenAI-compatible). The default judge model is `qwen3.6:27b`. To override the endpoint, set `LOOM_JUDGE_BASE_URL` (e.g. `export LOOM_JUDGE_BASE_URL=http://127.0.0.1:8000/v1` to point at OMLX instead). Thinking models (such as qwen3) are handled automatically — loom passes `reasoning_effort: "none"` so they return clean JSON rather than empty content. DeepSeek judge models skip ollama and reuse the main DeepSeek client.
+
 ## Security note
 
 loom executes model-generated shell commands and file writes inside the

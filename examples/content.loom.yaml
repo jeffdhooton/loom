@@ -15,7 +15,7 @@ execute:
   tools: [read, write, web]
 verify:
   gate: judge
-  judge_model: gpt-oss-20b
+  judge_model: qwen3.6:27b
   rubric: ~/workspace/loom/examples/rubric.md
   pass_threshold: 0.8
 stop:
