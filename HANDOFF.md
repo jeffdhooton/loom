@@ -143,6 +143,30 @@ Built via subagent-driven TDD (superpowers): 14 tasks, fresh implementer + per-t
 
 ---
 
+## 8b. Stress sweep (branch `stress-test-sweep`, 2026-06-22)
+
+Built + ran a 4-stage stress sweep to exercise the **closed loop itself** (every prior
+run passed on iter 1). Specs `examples/stress-*.loom.yaml`; pristine seeds + bootstrap
+in `examples/stress/` (mutable working dirs gitignored, recreate with
+`bash examples/stress/setup.sh`). Full findings: `examples/stress/README.md`.
+
+| Stage | Status | Iters | Cost | |
+|---|---|---|---|---|
+| 1 content (judge) | passed | 1 | $0.01 | judge gate now honest: 681w→263w in-band, buzzword-free, rubric met |
+| 2 coding (markers+bash) | passed | 1 | $0.00 | one-shot |
+| 2b coding (blind, no bash) | passed | 1 | $0.01 | one-shot **even blind** |
+| 3 endurance (unsatisfiable) | stopped | 6 →12 resume | $0.06 | graceful no_progress stop, exact accounting |
+
+**Headline finding:** loom's **outer loop only iterates when one EXECUTE pass can't
+finish/verify the task.** EXECUTE is itself a full agentic tool-loop, so DeepSeek-v4
+one-shots small well-specified tasks — even denied `bash` (2b). Reliable multi-iteration
+self-correction needs a target the executor can't complete/verify in one pass (Stage 3),
+not merely a "hard but small" one. Stage 1 confirms the two-layer judge gate is no longer
+a false-positive risk (the original pending validation).
+
+**Rough edge found:** `loom resume` restarts iteration numbering (spine showed n=1..6,1..6
+not 1..12); spine + budget totals intact. Candidate fix: seed `n` from `len(existing_iters)`.
+
 ## 9. Natural next directions (when you return)
 
 Pick any; none are started:
