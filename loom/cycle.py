@@ -65,23 +65,25 @@ class Cycle:
         tools = build_registry(self.spec.execute.tools)
         last: IterRecord | None = None
         no_progress = 0
+        prior = len(self.memory.load().iters)  # resume-aware: continue the spine's numbering
 
-        for n in range(1, self.spec.stop.max_iters + 1):
+        for i in range(1, self.spec.stop.max_iters + 1):
+            n = prior + i  # persistent record label; `i` is the per-run counter (UI/cap)
             if self.budget.should_stop():
                 self.memory.set_status("budget_exhausted")
                 break
 
             # DISCOVER
-            self.ui.stage("DISCOVER", n, self.spec.stop.max_iters)
+            self.ui.stage("DISCOVER", i, self.spec.stop.max_iters)
             context = self._discover()
 
             # PLAN
-            self.ui.stage("PLAN", n, self.spec.stop.max_iters)
+            self.ui.stage("PLAN", i, self.spec.stop.max_iters)
             plan, plan_usage = self._plan(context, last)
             self.budget.add(self.spec.execute.plan_model, plan_usage)
 
             # EXECUTE
-            self.ui.stage("EXECUTE", n, self.spec.stop.max_iters)
+            self.ui.stage("EXECUTE", i, self.spec.stop.max_iters)
             result = self.executor.execute(
                 system=_EXEC_SYSTEM.format(goal=self.spec.goal),
                 task=f"Working directory (all paths are relative to here): {cwd}\nPlan for this iteration:\n{plan}",
@@ -92,7 +94,7 @@ class Cycle:
             self.budget.add(self.spec.execute.model, result.usage)
 
             # VERIFY
-            self.ui.stage("VERIFY", n, self.spec.stop.max_iters)
+            self.ui.stage("VERIFY", i, self.spec.stop.max_iters)
             gate_result = self.gate.verify(cwd=cwd, on_event=lambda e: None)
             self.ui.verify(gate_result)
 
