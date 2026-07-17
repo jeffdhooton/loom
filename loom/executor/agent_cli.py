@@ -39,6 +39,10 @@ class AgentCLIExecutor(Executor):
             on_event(ExecEvent("note", {"text": f"agent timeout after {self.timeout}s"}))
             return ExecuteResult(text=f"[agent timeout after {self.timeout}s]",
                                  usage=Usage(), steps=[])
+        except FileNotFoundError as e:
+            on_event(ExecEvent("note", {"text": f"agent binary not found: {argv[0]} ({e})"}))
+            return ExecuteResult(text=f"[agent binary not found: {argv[0]}]",
+                                 usage=Usage(), steps=[])
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
             on_event(ExecEvent("note", {"text": f"agent exit {proc.returncode}: {err[:200]}"}))

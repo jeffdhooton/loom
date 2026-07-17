@@ -26,6 +26,18 @@ def test_agent_judge_client_shape(monkeypatch):
     assert json.loads(resp.choices[0].message.content)["score"] == 0.95
 
 
+def test_agent_judge_client_missing_binary_fails_closed():
+    from loom.gates.agent_judge import AgentJudgeClient
+
+    def fake_run(argv, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", argv[0])
+
+    client = AgentJudgeClient(engine="claude", runner=fake_run)
+    resp = client.chat.completions.create(
+        model="claude", messages=[{"role": "user", "content": "grade this"}])
+    assert resp.choices[0].message.content == "{}"
+
+
 def test_make_judge_client_dispatches_to_agent(monkeypatch):
     from loom.clients import make_judge_client
     from loom.gates.agent_judge import AgentJudgeClient

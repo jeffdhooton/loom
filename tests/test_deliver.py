@@ -88,6 +88,32 @@ def test_deliver_goal_containing_deploy_word_still_delivers(tmp_path):
     assert res.pr_url == "https://github.com/x/y/pull/43"
 
 
+def test_deliver_branch_main_is_refused(tmp_path):
+    import pytest
+    from loom.deliver import deliver
+    with pytest.raises(ValueError, match="(?i)branch|main"):
+        deliver(_spec({"branch": "main"}), tmp_path, _passed_state(),
+                runner=lambda a, **k: _FakeCompleted(0, ""))
+
+
+def test_deliver_stopped_writes_report_to_durable_report_dir(tmp_path):
+    from loom.deliver import deliver
+    cwd = tmp_path / "worktree"
+    cwd.mkdir()
+    report_dir = tmp_path / "durable"
+    report_dir.mkdir()
+    res = deliver(_spec({"push": True, "pr": True}), cwd, _stopped_state(),
+                  runner=lambda a, **k: _FakeCompleted(0, ""),
+                  report_dir=report_dir)
+    assert res.delivered is False
+    assert res.report_path
+    report_path = Path(res.report_path)
+    assert report_path.exists()
+    assert report_path.parent == report_dir
+    assert not (cwd / "report.md").exists()
+    assert "2 tests fail" in report_path.read_text()
+
+
 def test_guards_refuse_real_deploy_and_merge_commands():
     import pytest
     from loom.deliver import _check_allowed_verb, _check_no_merge

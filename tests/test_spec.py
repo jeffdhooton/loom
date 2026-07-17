@@ -132,3 +132,46 @@ def test_deliver_merge_true_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="merge"):
         load_spec(str(p))
+
+
+def test_deliver_branch_main_rejected(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "deliver:\n  branch: main\n"
+    )
+    with pytest.raises(ValueError, match="branch"):
+        load_spec(str(p))
+
+
+def test_judge_engine_set_must_differ_from_execute_engine_regardless_of_model(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: content\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: claude\n  model: claude\n"
+        "verify:\n  gate: judge\n  judge_engine: claude\n  judge_model: gpt-oss-20b\n"
+        "  rubric: rubric.md\n"
+    )
+    with pytest.raises(ValueError, match="judge_engine"):
+        load_spec(str(p))
+
+
+def test_judge_engine_cross_engine_still_loads(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: content\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: claude\n  model: claude\n"
+        "verify:\n  gate: judge\n  judge_engine: codex\n  judge_model: codex\n"
+        "  rubric: rubric.md\n"
+    )
+    s = load_spec(str(p))
+    assert s.verify.judge_engine == "codex"

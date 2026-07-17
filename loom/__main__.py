@@ -70,7 +70,10 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
         # removed by wt.cleanup() below, so this has to happen inside the try.
         if getattr(spec, "deliver", None):
             from loom.deliver import deliver as _deliver
-            result = _deliver(spec, cwd, state)
+            # report_dir=memory.root: for `worktree: true` runs, cwd is a temp
+            # worktree removed by wt.cleanup() in this finally block, so a
+            # failure-path report.md must land somewhere durable instead.
+            result = _deliver(spec, cwd, state, report_dir=memory.root)
             if result.delivered:
                 print(f"delivered: {', '.join(result.actions)}"
                       + (f" — {result.pr_url}" if result.pr_url else ""))

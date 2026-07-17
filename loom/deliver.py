@@ -40,18 +40,22 @@ def _run(runner, argv: list[str], cwd: Path):
     return runner(argv, cwd=str(cwd), capture_output=True, text=True)
 
 
-def _write_report(spec, cwd: Path, state) -> str:
+def _write_report(spec, cwd: Path, state, report_dir: Path | None = None) -> str:
     lines = [f"# loom report — {spec.name}", "", f"**Goal:** {spec.goal}",
              f"**Status:** {state.status}", "", "## Iterations"]
     for it in state.iters:
         mark = "PASS" if getattr(it, "passed", False) else "FAIL"
         lines.append(f"- iter {it.n}: {mark} — {getattr(it, 'feedback', '')}")
-    path = cwd / "report.md"
+    # Prefer the durable report_dir (survives worktree cleanup) over cwd,
+    # which for `worktree: true` runs is a temp dir removed by
+    # Worktree.cleanup() right after deliver() returns.
+    out_dir = report_dir if report_dir is not None else cwd
+    path = out_dir / "report.md"
     path.write_text("\n".join(lines) + "\n")
     return str(path)
 
 
-def deliver(spec, cwd: Path, state, runner=subprocess.run) -> DeliverResult:
+def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | None = None) -> DeliverResult:
     """Branch -> commit -> (push) -> (PR) -> (sheet) -> (notify), gated on a
     passed run. NEVER merges to main, NEVER deploys. All side-effecting calls
     go through `runner` so callers can fully mock git/gh/gog in tests.
@@ -64,11 +68,18 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run) -> DeliverResult:
         # without going through load_spec.
         raise ValueError("deliver.merge must be false — loom never merges to main")
 
+    branch = d.get("branch") or f"loop/{spec.name}"
+    if branch.lower() in {"main", "master"}:
+        # Defense in depth: loom.spec.load_spec already refuses a main/master
+        # deliver.branch at load time, but deliver() must independently
+        # refuse it too, since it can be called directly without going
+        # through load_spec.
+        raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
+
     if state.status != "passed":
-        return DeliverResult(delivered=False, report_path=_write_report(spec, cwd, state))
+        return DeliverResult(delivered=False, report_path=_write_report(spec, cwd, state, report_dir))
 
     actions: list[str] = []
-    branch = d.get("branch") or f"loop/{spec.name}"
 
     _run(runner, ["git", "checkout", "-B", branch], cwd)
     _run(runner, ["git", "add", "-A"], cwd)

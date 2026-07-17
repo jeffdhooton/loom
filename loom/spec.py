@@ -129,10 +129,17 @@ def load_spec(path: str) -> LoopSpec:
     if gate == "judge" and not verify.rubric:
         raise ValueError("judge gate requires verify.rubric")
     if gate == "judge":
-        same_engine = (judge_engine or execute.engine) == execute.engine
-        same_model = verify.judge_model == execute.model
-        if same_engine and same_model:
-            raise ValueError("maker != checker: judge must differ from executor by engine or model")
+        if judge_engine is not None:
+            # Agent judges (judge_engine set) ignore judge_model entirely —
+            # AgentJudgeClient just runs the CLI for that engine — so the
+            # only real signal is the engine itself.
+            if judge_engine == execute.engine:
+                raise ValueError("maker != checker: judge_engine must differ from execute.engine")
+        else:
+            # judge_engine unset -> judge runs on the same engine as the
+            # executor, so the only remaining signal is the model.
+            if verify.judge_model == execute.model:
+                raise ValueError("maker != checker: judge must differ from executor by engine or model")
 
     s_raw = raw.get("stop") or {}
     stop = StopCfg(
@@ -151,6 +158,8 @@ def load_spec(path: str) -> LoopSpec:
     deliver = raw.get("deliver") or {}
     if deliver.get("merge"):
         raise ValueError("deliver.merge must be false — loom never merges to main")
+    if str(deliver.get("branch") or "").lower() in {"main", "master"}:
+        raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
 
     return LoopSpec(
         name=raw["name"], goal=raw["goal"], type=raw["type"],

@@ -39,7 +39,7 @@ class _Completions:
         try:
             proc = self.runner(argv, capture_output=True, text=True, timeout=self.timeout)
             content = (proc.stdout or "").strip() if proc.returncode == 0 else "{}"
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, FileNotFoundError):
             content = "{}"
         return _Response(choices=[_Choice(_Message(content))])
 

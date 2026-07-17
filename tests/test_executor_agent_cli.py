@@ -62,6 +62,20 @@ def test_claude_executor_timeout_does_not_raise():
     assert any(e.kind == "note" for e in events)
 
 
+def test_claude_executor_missing_binary_does_not_raise():
+    def fake_run(argv, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", argv[0])
+
+    ex = ClaudeExecutor(runner=fake_run)
+    events = []
+    res = ex.execute(system="S", task="T", tools=[], model="claude",
+                     cwd=Path("/tmp/wt"), on_event=events.append)
+    assert res.usage.input_tokens == 0
+    assert res.usage.output_tokens == 0
+    assert res.text
+    assert any(e.kind == "note" for e in events)
+
+
 def test_codex_executor_falls_back_to_raw_text():
     def fake_run(argv, **kwargs):
         return _FakeCompleted(0, "final answer line")
