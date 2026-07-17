@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Callable
 
@@ -38,6 +39,10 @@ class JudgeGate(Gate):
         self.checks = checks or []
 
     def _read_artifact(self, cwd: Path) -> str:
+        if self.artifact == "@diff":
+            proc = subprocess.run(["git", "diff", "HEAD"], cwd=str(cwd),
+                                  capture_output=True, text=True)
+            return proc.stdout or "[empty diff]"
         path = Path(self.artifact) if self.artifact else None
         if path and not path.is_absolute():
             path = cwd / path
