@@ -261,13 +261,25 @@ deliver call site), `examples/agent-coding.loom.yaml`, `scripts/agent-smoke.sh`.
    truly blocks writes for the judge, and that headless auth (no browser
    popup, no interactive login) works in a non-interactive shell/cron
    context.
-2. **Safety gap: `deliver.branch: main` is not rejected.** `load_spec` only
-   validates `deliver.merge` (must be false); `deliver.branch` is passed
-   through unchecked (`loom/spec.py`, `loom/deliver.py::deliver`). A spec
-   with `deliver: {branch: main}` would `git checkout -B main`, commit
-   directly on it, and (if `push` isn't disabled) push straight to
-   `origin/main` — no merge command is issued, but the safety property "loom
-   only ever lands work via a reviewed PR" would be silently defeated for
-   that one spec. Should be a `load_spec`-time rejection (e.g. disallow
-   `branch: main`/`master`, or require `deliver.branch` to differ from the
-   workspace's default branch) before this is used unattended.
+**Fixed in final review (commit `2abb996`):** the four items below were found
+by the whole-branch review and resolved before merge (85 tests):
+- **C1 — `deliver.branch: main` now rejected** at `load_spec` and defensively
+  in `deliver()` (disallows `main`/`master`), closing the push-to-trunk gap.
+- **I1 — failure-path `report.md` now durable:** `deliver(report_dir=...)` is
+  passed `memory.root` (`~/.loom/runs/<name>/`) by `cmd_run`, so the report
+  survives worktree cleanup instead of being deleted with the temp tree.
+- **I2 — cross-engine judge enforced:** when `verify.judge_engine` is set it
+  must differ from `execute.engine` (agent judges ignore `judge_model`, so the
+  old model-only check was bypassable).
+- **I3 — missing `claude`/`codex` binary no longer raises:** `FileNotFoundError`
+  is caught in `agent_cli.py` (unproductive result) and `agent_judge.py`
+  (fails closed, `"{}"`).
+
+**Still open:** item 1 above (confirm real CLI flags + headless auth) remains
+the one genuine pre-first-run gate. Plus these non-blocking follow-up nits:
+   no e2e test for the `cmd_run`→`deliver`
+   `report_dir` wiring; `@diff` ignores `git diff` returncode; dead top-level
+   `make_deepseek_client` import (shadowed); `_check_no_merge` matches only
+   `argv[1:3]`; smoke script `set -e` echo + BSD `sed`; a single agent turn
+   (`timeout` default 1800s) can overrun a smaller `wall_clock_secs` (soft,
+   between-iteration cap).
