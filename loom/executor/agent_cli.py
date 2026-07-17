@@ -34,7 +34,8 @@ class AgentCLIExecutor(Executor):
         on_event(ExecEvent("note", {"text": f"agent: {argv[0]} {argv[1] if len(argv) > 1 else ''}"}))
         try:
             proc = self.runner(argv, cwd=cwd, capture_output=True,
-                               text=True, timeout=self.timeout)
+                               text=True, timeout=self.timeout,
+                               stdin=subprocess.DEVNULL)
         except subprocess.TimeoutExpired:
             on_event(ExecEvent("note", {"text": f"agent timeout after {self.timeout}s"}))
             return ExecuteResult(text=f"[agent timeout after {self.timeout}s]",
@@ -75,7 +76,14 @@ def _claude_parse(stdout: str) -> tuple[str, Usage]:
 
 
 def _codex_argv(prompt: str, cwd: Path, model: str) -> list[str]:
-    return ["codex", "exec", "--json", prompt]
+    # --sandbox workspace-write lets the maker edit files in the worktree
+    # (exec defaults to read-only, which would block all edits). The judge
+    # uses read-only separately (see gates/agent_judge.py).
+    argv = ["codex", "exec", "--json", "--sandbox", "workspace-write"]
+    if model and model != "codex":
+        argv += ["--model", model]
+    argv.append(prompt)
+    return argv
 
 
 def _codex_parse(stdout: str) -> tuple[str, Usage]:

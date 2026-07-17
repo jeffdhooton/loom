@@ -77,7 +77,11 @@ def test_claude_executor_missing_binary_does_not_raise():
 
 
 def test_codex_executor_falls_back_to_raw_text():
+    captured = {}
+
     def fake_run(argv, **kwargs):
+        captured["argv"] = argv
+        captured["stdin"] = kwargs.get("stdin")
         return _FakeCompleted(0, "final answer line")
 
     ex = CodexExecutor(runner=fake_run)
@@ -85,4 +89,9 @@ def test_codex_executor_falls_back_to_raw_text():
                      cwd=Path("/tmp/wt"), on_event=lambda e: None)
     assert "final answer line" in res.text
     assert res.usage.output_tokens == 0
-    # argv starts with codex exec
+    # maker must run in a writable sandbox or it cannot edit files
+    assert captured["argv"][:2] == ["codex", "exec"]
+    assert "--sandbox" in captured["argv"]
+    assert "workspace-write" in captured["argv"]
+    # never block reading stdin on an unattended run
+    assert captured["stdin"] == subprocess.DEVNULL
