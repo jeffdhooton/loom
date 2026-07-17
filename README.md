@@ -45,6 +45,33 @@ a budget cap.
 `examples/coding.loom.yaml` shows a coding loop that runs pytest as its gate.
 `examples/content.loom.yaml` shows a content loop where a judge model scores
 the output against a rubric and iterates until the score meets the threshold.
+`examples/agent-coding.loom.yaml` shows an agent-engine coding loop (see
+"Engines" below).
+
+### Engines
+
+`execute.engine` selects who drives the EXECUTE stage: `deepseek` (default —
+loom's own tool-calling loop against the DeepSeek API) or `claude` / `codex`
+(shell out to the `claude` / `codex` CLI as a subprocess and let that agent
+own its own tool use — read/write/edit/bash — inside the workspace). Agent
+engines are subscription-based and **unmetered on tokens** (priced at $0 in
+`budget.py`), so their `stop` conditions are `stop.max_iters` and
+`stop.wall_clock_secs` rather than a USD/token budget cap.
+
+`verify.judge_engine: claude | codex` runs the VERIFY-stage judge gate as a
+**fresh, read-only** Claude/Codex agent process (`--permission-mode plan` /
+`--sandbox read-only`) instead of an OpenAI-compatible chat model — a
+different engine grading the work, not the model that produced it. Set
+`deliver.artifact: "@diff"` (the judge gate's artifact source lives under the
+spec's `deliver:` block, e.g. `gates/judge.py`) to have the grader review the
+`git diff HEAD` of a coding loop rather than a single output file.
+
+A `deliver:` block (`branch`, `push`, `pr`, `sheet_task`, `notify`) opens a
+feature branch, pushes it, and opens a PR via `gh` on a **passed** run —
+loom **never merges to `main` and never deploys**; every side-effecting
+command loom emits is restricted to `git`/`gh`/`gog`, and `deliver.merge` is
+rejected at spec load time. On a run that does not pass, `deliver` instead
+writes a local `report.md` and takes no git action.
 
 ## Local judge (content loops)
 

@@ -38,7 +38,7 @@ def test_cmd_run_converges(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "_build_executor", lambda spec: WinningExecutor())
     monkeypatch.setattr(cli, "_build_plan_client",
-                        lambda: _fake_plan_client())
+                        lambda spec: _fake_plan_client())
     monkeypatch.setenv("LOOM_RUNS_ROOT", str(tmp_path / "runs"))
 
     rc = cli.main(["run", str(spec)])
@@ -58,3 +58,22 @@ def _fake_plan_client():
 def test_ls_empty(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("LOOM_RUNS_ROOT", str(tmp_path / "runs"))
     assert cli.main(["ls"]) == 0
+
+
+def test_build_executor_selects_engine(tmp_path, monkeypatch):
+    from loom import __main__ as m
+    from loom.executor import ClaudeExecutor, CodexExecutor, DeepSeekExecutor
+    from loom.executor.agent_plan import AgentPlanClient
+
+    def spec_with(engine):
+        from loom.spec import ExecuteCfg
+        class S:  # minimal stand-in
+            execute = ExecuteCfg(engine=engine)
+        return S()
+
+    # DeepSeek path must not require a real key for this unit test:
+    monkeypatch.setattr(m, "make_deepseek_client", lambda: object(), raising=False)
+
+    assert isinstance(m._build_executor(spec_with("claude")), ClaudeExecutor)
+    assert isinstance(m._build_executor(spec_with("codex")), CodexExecutor)
+    assert isinstance(m._build_plan_client(spec_with("claude")), AgentPlanClient)

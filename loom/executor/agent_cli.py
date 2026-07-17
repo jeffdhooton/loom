@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+from typing import Callable
+
+from loom.budget import Usage
+from loom.tools import Tool
+from .base import ExecEvent, ExecuteResult, Executor
+
+
+class AgentCLIExecutor(Executor):
+    """Drive a CLI coding agent (Claude Code / Codex) as a loom executor.
+
+    Unlike DeepSeekExecutor, the agent owns its own tools; loom passes the
+    composed prompt, sets cwd to the worktree, and captures the final text +
+    usage. A failed agent turn never raises — it is just an unproductive
+    iteration the gate will fail.
+    """
+
+    def __init__(self, argv_fn: Callable[[str, Path, str], list[str]],
+                 parse_fn: Callable[[str], tuple[str, Usage]],
+                 timeout: int = 1800, runner=subprocess.run):
+        self.argv_fn = argv_fn
+        self.parse_fn = parse_fn
+        self.timeout = timeout
+        self.runner = runner
+
+    def execute(self, system: str, task: str, tools: list[Tool], model: str,
+                cwd: Path, on_event: Callable[[ExecEvent], None]) -> ExecuteResult:
+        prompt = f"{system}\n\n{task}"
+        argv = self.argv_fn(prompt, cwd, model)
+        on_event(ExecEvent("note", {"text": f"agent: {argv[0]} {argv[1] if len(argv) > 1 else ''}"}))
+        try:
+            proc = self.runner(argv, cwd=cwd, capture_output=True,
+                               text=True, timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            on_event(ExecEvent("note", {"text": f"agent timeout after {self.timeout}s"}))
+            return ExecuteResult(text=f"[agent timeout after {self.timeout}s]",
+                                 usage=Usage(), steps=[])
+        except FileNotFoundError as e:
+            on_event(ExecEvent("note", {"text": f"agent binary not found: {argv[0]} ({e})"}))
+            return ExecuteResult(text=f"[agent binary not found: {argv[0]}]",
+                                 usage=Usage(), steps=[])
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "").strip()
+            on_event(ExecEvent("note", {"text": f"agent exit {proc.returncode}: {err[:200]}"}))
+            return ExecuteResult(text=err or f"[agent exit {proc.returncode}]",
+                                 usage=Usage(), steps=[])
+        text, usage = self.parse_fn(proc.stdout or "")
+        on_event(ExecEvent("assistant", {"text": text}))
+        return ExecuteResult(text=text, usage=usage, steps=[])
+
+
+def _claude_argv(prompt: str, cwd: Path, model: str) -> list[str]:
+    argv = ["claude", "-p", prompt, "--output-format", "json",
+            "--permission-mode", "acceptEdits"]
+    if model and model != "claude":
+        argv += ["--model", model]  # e.g. "claude:opus" -> pass the concrete model id you use
+    return argv
+
+
+def _claude_parse(stdout: str) -> tuple[str, Usage]:
+    try:
+        data = json.loads(stdout)
+    except (ValueError, json.JSONDecodeError):
+        return stdout.strip(), Usage()
+    text = str(data.get("result") or data.get("text") or "").strip()
+    u = data.get("usage") or {}
+    usage = Usage(input_tokens=int(u.get("input_tokens", 0) or 0),
+                  output_tokens=int(u.get("output_tokens", 0) or 0),
+                  cache_read_tokens=int(u.get("cache_read_input_tokens", 0) or 0))
+    return text, usage
+
+
+def _codex_argv(prompt: str, cwd: Path, model: str) -> list[str]:
+    return ["codex", "exec", "--json", prompt]
+
+
+def _codex_parse(stdout: str) -> tuple[str, Usage]:
+    # codex exec --json streams JSONL events; take the last assistant/result line.
+    text = stdout.strip()
+    usage = Usage()
+    last = None
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(ev, dict):
+            last = ev
+    if isinstance(last, dict):
+        text = str(last.get("message") or last.get("text") or last.get("result") or text).strip()
+        u = last.get("usage") or {}
+        usage = Usage(input_tokens=int(u.get("input_tokens", 0) or 0),
+                      output_tokens=int(u.get("output_tokens", 0) or 0))
+    return text, usage
+
+
+class ClaudeExecutor(AgentCLIExecutor):
+    def __init__(self, timeout: int = 1800, runner=subprocess.run):
+        super().__init__(_claude_argv, _claude_parse, timeout=timeout, runner=runner)
+
+
+class CodexExecutor(AgentCLIExecutor):
+    def __init__(self, timeout: int = 1800, runner=subprocess.run):
+        super().__init__(_codex_argv, _codex_parse, timeout=timeout, runner=runner)

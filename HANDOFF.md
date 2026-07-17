@@ -180,3 +180,106 @@ Pick any; none are started:
 5. **Hermes seam** — let Hermes author/manage loom specs (the original "port in later" idea).
 
 To resume: `cd ~/workspace/loom && . .venv/bin/activate && pytest -q` (expect 50 passing), then read the spec + plan in dotfiles. Everything is committed and pushed.
+
+---
+
+## 10. Phase A — multi-engine executors (2026-07-17, branch `feat/multi-engine-executors`)
+
+Built via subagent-driven SDD (9 tasks; brief/report/spec-coverage per task at
+`.superpowers/sdd/task-*-brief.md`). Adds Claude/Codex as alternative EXECUTE
+engines and a `deliver` connector that opens a PR on green — loom is no longer
+DeepSeek-only or dead-ended at a passing gate. `pytest -q` now shows **78
+passing** (was 50). Not yet merged to `main`.
+
+**What shipped:**
+- **`execute.engine: deepseek | claude | codex`** (`loom/spec.py::VALID_ENGINES`,
+  dispatched in `loom/__main__.py::_build_executor`). `claude`/`codex` shell
+  out to the CLI (`AgentCLIExecutor` in `loom/executor/agent_cli.py`,
+  concrete `ClaudeExecutor`/`CodexExecutor`) and let the agent own its own
+  tool use (read/write/edit/bash) inside the workspace — loom just composes
+  the prompt, sets `cwd`, and parses stdout for text + usage. A failed or
+  timed-out agent subprocess **never raises**; it comes back as an unproductive
+  `ExecuteResult` and the gate fails it like any other bad iteration (verified
+  live: killing/erroring the stub agent just fails VERIFY, no crash).
+- **Zero-cost PLAN pass-through for agent engines**
+  (`loom/executor/agent_plan.py::AgentPlanClient`) — the agent plans
+  internally during EXECUTE, so PLAN is a stub that keeps `cycle.py`
+  unchanged. Because `claude`/`codex` are subscription engines, `budget.py`
+  prices both at `$0` (`PRICING["claude"]`/`PRICING["codex"]`) — they are
+  **unmetered on tokens**, so agent-engine loops are governed by
+  `stop.max_iters` + `stop.wall_clock_secs` instead of `budget.max_usd`.
+  `Budget.should_stop()` now also checks wall-clock elapsed
+  (`loom/budget.py`).
+- **`verify.judge_engine: claude | codex`** (`loom/spec.py::VALID_JUDGE_ENGINES`,
+  wired in `loom/clients.py::make_judge_client`) runs the judge gate as a
+  **fresh, read-only** agent process — `claude -p ... --permission-mode plan`
+  / `codex exec --sandbox read-only` (`loom/gates/agent_judge.py::AgentJudgeClient`)
+  — so the grader is a different engine than the one that did the work, and
+  it cannot edit. The OpenAI-shaped response wrapper means `JudgeGate`
+  (`loom/gates/judge.py`) parses its stdout unchanged.
+- **`@diff` artifact** (`loom/gates/judge.py::JudgeGate._read_artifact`) — when
+  `deliver.artifact: "@diff"`, the judge gate reviews `git diff HEAD` instead
+  of a single output file, so a coding loop's changes (not just a content
+  file) can be agent-graded.
+- **`deliver:` connector** (`loom/deliver.py`) — on a **passed** run: branch
+  (`git checkout -B`), commit, optional push + `gh pr create` (base `main`),
+  optional sheet note via `gog`, optional `notify` flag. **Never merges,
+  never deploys** — `deliver.merge` is rejected both at spec load
+  (`loom/spec.py::load_spec`) and again defensively inside `deliver()`
+  itself; every side-effecting subprocess call is restricted to an
+  **allow-list on the command verb** (`git`/`gh`/`gog`, `ALLOWED_VERBS` in
+  `loom/deliver.py`) rather than a text scan of PR titles/bodies, so a
+  goal string containing the word "merge" can't trip a false guard or be
+  used to smuggle a disallowed verb. On a non-passed run, `deliver` instead
+  writes `report.md` (goal, status, per-iteration pass/fail + feedback) and
+  takes no git action.
+- **Proving ground:** `examples/agent-coding.loom.yaml` (agent engine,
+  command gate, `deliver.push/pr: false` for local-only) +
+  `scripts/agent-smoke.sh`, which drops a stub `claude` CLI on `PATH` that
+  fixes the sandbox bug and prove the full loop — DISCOVER→...→ITERATE,
+  budget $0.00, `deliver` opening a local branch — closes offline with no
+  real model or network call. Re-ran live during this handoff: passed in 1
+  iteration, `delivered: branch loop/agent-sandbox-fix, notify`, exit 0.
+
+**Key files:** `loom/spec.py` (engine/judge_engine/wall_clock_secs/deliver.merge
+guard), `loom/budget.py` (wall-clock stop, zero-cost agent pricing),
+`loom/executor/agent_cli.py` + `agent_plan.py`, `loom/gates/agent_judge.py`,
+`loom/gates/judge.py` (`@diff`), `loom/deliver.py`, `loom/__main__.py`
+(`_build_executor`/`_build_plan_client` dispatch + judge-engine wiring +
+deliver call site), `examples/agent-coding.loom.yaml`, `scripts/agent-smoke.sh`.
+
+**Open items:**
+1. **Confirm real CLI flags + headless auth before the first live overnight
+   run.** `agent_cli.py` and `agent_judge.py` were built and tested against
+   *assumed* flag shapes (`claude -p ... --output-format json
+   --permission-mode acceptEdits` / `--permission-mode plan`; `codex exec
+   --json` / `codex exec --sandbox read-only`) and mocked/stubbed subprocess
+   runners — never against the real `claude`/`codex` binaries. Before
+   trusting an unattended run: verify these flags exist on the installed CLI
+   versions, that `--permission-mode acceptEdits` actually allows
+   file-editing without an interactive prompt, that `--sandbox read-only`
+   truly blocks writes for the judge, and that headless auth (no browser
+   popup, no interactive login) works in a non-interactive shell/cron
+   context.
+**Fixed in final review (commit `2abb996`):** the four items below were found
+by the whole-branch review and resolved before merge (85 tests):
+- **C1 — `deliver.branch: main` now rejected** at `load_spec` and defensively
+  in `deliver()` (disallows `main`/`master`), closing the push-to-trunk gap.
+- **I1 — failure-path `report.md` now durable:** `deliver(report_dir=...)` is
+  passed `memory.root` (`~/.loom/runs/<name>/`) by `cmd_run`, so the report
+  survives worktree cleanup instead of being deleted with the temp tree.
+- **I2 — cross-engine judge enforced:** when `verify.judge_engine` is set it
+  must differ from `execute.engine` (agent judges ignore `judge_model`, so the
+  old model-only check was bypassable).
+- **I3 — missing `claude`/`codex` binary no longer raises:** `FileNotFoundError`
+  is caught in `agent_cli.py` (unproductive result) and `agent_judge.py`
+  (fails closed, `"{}"`).
+
+**Still open:** item 1 above (confirm real CLI flags + headless auth) remains
+the one genuine pre-first-run gate. Plus these non-blocking follow-up nits:
+   no e2e test for the `cmd_run`→`deliver`
+   `report_dir` wiring; `@diff` ignores `git diff` returncode; dead top-level
+   `make_deepseek_client` import (shadowed); `_check_no_merge` matches only
+   `argv[1:3]`; smoke script `set -e` echo + BSD `sed`; a single agent turn
+   (`timeout` default 1800s) can overrun a smaller `wall_clock_secs` (soft,
+   between-iteration cap).

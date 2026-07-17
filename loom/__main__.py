@@ -4,19 +4,31 @@ import os
 import sys
 from pathlib import Path
 
+from loom.clients import make_deepseek_client
+
 
 def _runs_root() -> Path:
     return Path(os.environ.get("LOOM_RUNS_ROOT", str(Path.home() / ".loom" / "runs")))
 
 
 def _build_executor(spec):
+    engine = spec.execute.engine
+    if engine == "claude":
+        from loom.executor import ClaudeExecutor
+        return ClaudeExecutor()
+    if engine == "codex":
+        from loom.executor import CodexExecutor
+        return CodexExecutor()
     from loom.clients import make_deepseek_client
     from loom.executor import DeepSeekExecutor
     from loom.budget import PRICING
     return DeepSeekExecutor(client=make_deepseek_client(), pricing=PRICING)
 
 
-def _build_plan_client():
+def _build_plan_client(spec):
+    if spec.execute.engine in ("claude", "codex"):
+        from loom.executor.agent_plan import AgentPlanClient
+        return AgentPlanClient()
     from loom.clients import make_deepseek_client
     return make_deepseek_client()
 
@@ -38,20 +50,35 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
         if memory.root.exists():
             shutil.rmtree(memory.root)
 
-    budget = Budget(spec.budget.max_usd, spec.budget.max_tokens, PRICING)
+    budget = Budget(spec.budget.max_usd, spec.budget.max_tokens, PRICING,
+                     wall_clock_secs=spec.stop.wall_clock_secs)
     ui = StreamUI(name=spec.name, budget=budget)
     ui.header()
 
-    judge_client = (make_judge_client(spec.verify.judge_model)
+    judge_client = (make_judge_client(spec.verify.judge_model, engine=spec.verify.judge_engine)
                     if spec.verify.gate == "judge" else None)
     gate = build_gate(spec, judge_client=judge_client)
     executor = _build_executor(spec)
-    plan_client = _build_plan_client()
+    plan_client = _build_plan_client(spec)
 
     cwd, wt = prepare_workspace(spec)
     try:
         cycle = Cycle(spec, executor, gate, memory, budget, ui, plan_client)
         state = cycle.run(cwd=cwd)
+
+        # deliver() must run while `cwd` still exists — a worktree cwd is
+        # removed by wt.cleanup() below, so this has to happen inside the try.
+        if getattr(spec, "deliver", None):
+            from loom.deliver import deliver as _deliver
+            # report_dir=memory.root: for `worktree: true` runs, cwd is a temp
+            # worktree removed by wt.cleanup() in this finally block, so a
+            # failure-path report.md must land somewhere durable instead.
+            result = _deliver(spec, cwd, state, report_dir=memory.root)
+            if result.delivered:
+                print(f"delivered: {', '.join(result.actions)}"
+                      + (f" — {result.pr_url}" if result.pr_url else ""))
+            elif result.report_path:
+                print(f"not delivered — report at {result.report_path}")
     finally:
         if wt is not None:
             wt.cleanup()
