@@ -14,24 +14,37 @@ def stop_sentinel_path() -> Path:
 
 
 def _member_name(member_path: Path) -> str:
-    # member paths look like ".../<name>.loom.yaml"; strip both suffixes.
+    # Fallback when the spec can't be loaded: member paths look like
+    # ".../<name>.loom.yaml"; strip both suffixes.
     return member_path.stem.replace(".loom", "")
 
 
-def _run_member(member_path: Path, fresh: bool, run_loop) -> str:
+def _run_name(member_path: Path) -> str:
+    """Resolve the run-lookup key for a member: the spec's declared `name:`
+    field (that's what `Memory` keys `~/.loom/runs/<name>/` by), falling
+    back to the filename stem if the spec can't be loaded."""
+    from loom.spec import load_spec
+
+    try:
+        return load_spec(str(member_path)).name
+    except Exception:
+        return _member_name(member_path)
+
+
+def _run_member(member_path: Path, fresh: bool, run_loop) -> tuple[str, str]:
     from loom.spec import load_spec
 
     sentinel = stop_sentinel_path()
     try:
         spec = load_spec(str(member_path))
     except Exception:
-        return "error"
+        return _member_name(member_path), "error"
     try:
         state = run_loop(spec, fresh=fresh, ui=NullUI(),
                           abort_check=lambda: sentinel.exists())
-        return getattr(state, "status", "error")
+        return spec.name, getattr(state, "status", "error")
     except Exception:
-        return "error"
+        return spec.name, "error"
 
 
 def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[str, str]:
@@ -69,9 +82,9 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
     sem = threading.Semaphore(fs.concurrency)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=fs.concurrency) as ex:
-        futures: dict[concurrent.futures.Future, str] = {}
+        futures: list[concurrent.futures.Future] = []
 
-        def wrapped(member_path: Path) -> str:
+        def wrapped(member_path: Path) -> tuple[str, str]:
             try:
                 return _run_member(member_path, fresh, run_loop)
             finally:
@@ -79,16 +92,16 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
 
         for member in fs.members:
             sem.acquire()
-            name = _member_name(member)
             if sentinel.exists():
                 sem.release()
-                results[name] = "skipped"
+                results[_run_name(member)] = "skipped"
                 skipped += 1
                 continue
-            futures[ex.submit(wrapped, member)] = name
+            futures.append(ex.submit(wrapped, member))
 
         for fut in concurrent.futures.as_completed(futures):
-            results[futures[fut]] = fut.result()
+            name, status = fut.result()
+            results[name] = status
 
     if skipped:
         print(f"loom fleet: STOP sentinel detected — skipped {skipped} unstarted member(s)")
@@ -102,7 +115,7 @@ def fleet_status(fleet_path: str) -> str:
     runs_root = _runs_root()
     lines = [f"# fleet {fs.name}", "", f"{'member':30} {'status':16} {'iters':>6} {'spend':>8}"]
     for member in fs.members:
-        name = member.stem.replace(".loom", "")
+        name = _run_name(member)
         sp = runs_root / name / "state.json"
         if sp.exists():
             s = json.loads(sp.read_text())
