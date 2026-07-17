@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+
+
+class _FakeCompleted:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _passed_state():
+    return SimpleNamespace(status="passed", iters=[SimpleNamespace(n=1, passed=True, feedback="ok")])
+
+
+def _stopped_state():
+    return SimpleNamespace(status="stopped",
+                           iters=[SimpleNamespace(n=1, passed=False, feedback="2 tests fail")])
+
+
+def _spec(deliver):
+    ws = SimpleNamespace(repo=Path("/tmp/repo"), worktree=True, branch=None)
+    return SimpleNamespace(name="CS-341", goal="g", workspace=ws, deliver=deliver)
+
+
+def test_deliver_passed_opens_pr_and_updates_sheet(tmp_path):
+    from loom.deliver import deliver
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        if argv[:3] == ["gh", "pr", "create"]:
+            return _FakeCompleted(0, "https://github.com/x/y/pull/42\n")
+        return _FakeCompleted(0, "")
+
+    spec = _spec({"push": True, "pr": True, "sheet_task": "CS-341", "notify": False})
+    res = deliver(spec, tmp_path, _passed_state(), runner=fake_run)
+    assert res.delivered is True
+    assert res.pr_url == "https://github.com/x/y/pull/42"
+    flat = [" ".join(a) for a in calls]
+    assert any(c.startswith("git push") for c in flat)
+    assert any(c.startswith("gh pr create") for c in flat)
+    assert any("CS-341" in c for c in flat)  # sheet update referenced the task
+    # never a merge, never a deploy:
+    assert not any("pr merge" in c for c in flat)
+    assert not any("deploy" in c for c in flat)
+
+
+def test_deliver_stopped_writes_report_only(tmp_path):
+    from loom.deliver import deliver
+    calls = []
+    res = deliver(_spec({"push": True, "pr": True}), tmp_path, _stopped_state(),
+                  runner=lambda a, **k: calls.append(a) or _FakeCompleted(0, ""))
+    assert res.delivered is False
+    assert res.report_path and Path(res.report_path).exists()
+    assert "2 tests fail" in Path(res.report_path).read_text()
+    assert not any(a[:2] == ["gh", "pr"] for a in calls)
+
+
+def test_deliver_merge_flag_is_refused(tmp_path):
+    import pytest
+    from loom.deliver import deliver
+    with pytest.raises(ValueError, match="merge"):
+        deliver(_spec({"merge": True}), tmp_path, _passed_state(),
+                runner=lambda a, **k: _FakeCompleted(0, ""))

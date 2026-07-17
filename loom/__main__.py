@@ -65,6 +65,17 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
     try:
         cycle = Cycle(spec, executor, gate, memory, budget, ui, plan_client)
         state = cycle.run(cwd=cwd)
+
+        # deliver() must run while `cwd` still exists — a worktree cwd is
+        # removed by wt.cleanup() below, so this has to happen inside the try.
+        if getattr(spec, "deliver", None):
+            from loom.deliver import deliver as _deliver
+            result = _deliver(spec, cwd, state)
+            if result.delivered:
+                print(f"delivered: {', '.join(result.actions)}"
+                      + (f" — {result.pr_url}" if result.pr_url else ""))
+            elif result.report_path:
+                print(f"not delivered — report at {result.report_path}")
     finally:
         if wt is not None:
             wt.cleanup()
