@@ -98,3 +98,22 @@ def test_run_loop_is_reused_by_cmd_run(monkeypatch, tmp_path):
     monkeypatch.setattr(m, "run_loop", fake_run_loop)
     assert m.cmd_run("some.yaml", fresh=True) == 0
     assert called["path"] == "some.yaml" and called["fresh"] is True
+
+
+def test_fleet_stop_creates_sentinel(monkeypatch, tmp_path):
+    from loom import __main__ as m
+    from loom import fleet
+    monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
+    assert m.main(["fleet", "stop"]) == 0
+    assert fleet.stop_sentinel_path().exists()
+
+
+def test_fleet_run_dispatches(monkeypatch, tmp_path):
+    from loom import __main__ as m
+    from loom import fleet
+    called = {}
+    monkeypatch.setattr(fleet, "run_fleet",
+                        lambda p, **k: called.setdefault("run", p) or {"a": "passed"})
+    monkeypatch.setattr(fleet, "fleet_status", lambda p: "STATUS")
+    rc = m.main(["fleet", "run", "f.yaml"])
+    assert rc == 0 and called["run"] == "f.yaml"
