@@ -61,3 +61,74 @@ def test_load_spec_expands_tilde_in_path(tmp_path, monkeypatch):
     )
     s = load_spec("~/s.yaml")
     assert s.name == "x"
+
+
+def test_engine_defaults_to_deepseek(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    spec = load_spec(str(p))
+    assert spec.execute.engine == "deepseek"
+    assert spec.stop.wall_clock_secs is None
+
+
+def test_engine_claude_and_wall_clock_parse(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: claude\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "stop:\n  max_iters: 3\n  wall_clock_secs: 900\n"
+    )
+    spec = load_spec(str(p))
+    assert spec.execute.engine == "claude"
+    assert spec.stop.wall_clock_secs == 900
+
+
+def test_invalid_engine_rejected(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: gpt5\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    with pytest.raises(ValueError, match="execute.engine"):
+        load_spec(str(p))
+
+
+def test_judge_engine_same_as_executor_engine_rejected(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: content\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: claude\n  model: claude\n"
+        "verify:\n  gate: judge\n  judge_engine: claude\n  judge_model: claude\n"
+        "  rubric: rubric.md\n"
+    )
+    with pytest.raises(ValueError, match="maker != checker"):
+        load_spec(str(p))
+
+
+def test_deliver_merge_true_rejected(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "deliver:\n  merge: true\n"
+    )
+    with pytest.raises(ValueError, match="merge"):
+        load_spec(str(p))
