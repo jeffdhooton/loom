@@ -249,7 +249,13 @@ guard), `loom/budget.py` (wall-clock stop, zero-cost agent pricing),
 deliver call site), `examples/agent-coding.loom.yaml`, `scripts/agent-smoke.sh`.
 
 **Open items:**
-1. **Confirm real CLI flags + headless auth before the first live overnight
+1. ✅ **DONE 2026-07-17 — live test passed (both engines, merged `ab856bf`).**
+   Claude flags were correct as-is; Codex needed `--sandbox workspace-write` +
+   `stdin=DEVNULL` (commit `adad248`). Headless auth works for both. Full record:
+   `~/dotfiles/docs/superpowers/2026-07-17-loom-resume-and-phase-b-handoff.md` §2.4.
+   Still to do: one live cross-engine JUDGE-gate run before trusting the grader
+   unattended (the original item text below is kept for reference).
+   **Confirm real CLI flags + headless auth before the first live overnight
    run.** `agent_cli.py` and `agent_judge.py` were built and tested against
    *assumed* flag shapes (`claude -p ... --output-format json
    --permission-mode acceptEdits` / `--permission-mode plan`; `codex exec
