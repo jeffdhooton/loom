@@ -113,7 +113,7 @@ def test_fleet_run_dispatches(monkeypatch, tmp_path):
     from loom import fleet
     called = {}
     monkeypatch.setattr(fleet, "run_fleet",
-                        lambda p, **k: called.setdefault("run", p) or {"a": "passed"})
+                        lambda p, **k: called.setdefault("run", p) and {"a": "passed"})
     monkeypatch.setattr(fleet, "fleet_status", lambda p: "STATUS")
     rc = m.main(["fleet", "run", "f.yaml"])
     assert rc == 0 and called["run"] == "f.yaml"
