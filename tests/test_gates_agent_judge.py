@@ -12,11 +12,14 @@ class _FakeCompleted:
 
 
 def test_agent_judge_client_shape(monkeypatch):
+    import subprocess
     from loom.gates.agent_judge import AgentJudgeClient
     verdict = {"criteria": [{"name": "works", "pass": True, "evidence": "tests pass"}],
                "score": 0.95, "feedback": "ok"}
+    captured = {}
 
     def fake_run(argv, **kwargs):
+        captured["stdin"] = kwargs.get("stdin")
         return _FakeCompleted(0, json.dumps(verdict))
 
     client = AgentJudgeClient(engine="claude", runner=fake_run)
@@ -24,6 +27,8 @@ def test_agent_judge_client_shape(monkeypatch):
         model="claude", messages=[{"role": "user", "content": "grade this"}],
         extra_body={"reasoning_effort": "none"})  # extra kwargs ignored, not passed to CLI
     assert json.loads(resp.choices[0].message.content)["score"] == 0.95
+    # the grader must never block reading stdin on an unattended run
+    assert captured["stdin"] == subprocess.DEVNULL
 
 
 def test_agent_judge_client_missing_binary_fails_closed():
