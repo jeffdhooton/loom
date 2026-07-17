@@ -41,3 +41,20 @@ def test_no_caps_never_stops():
     b.add("deepseek-v4-pro", Usage(9_000_000, 9_000_000, 0))
     assert b.should_stop() is False
     assert b.warn() is False
+
+
+def test_wall_clock_stop(monkeypatch):
+    import loom.budget as b
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(b.time, "monotonic", lambda: clock["t"])
+    budget = b.Budget(max_usd=None, max_tokens=None, pricing=b.PRICING, wall_clock_secs=60)
+    assert budget.should_stop() is False
+    clock["t"] = 1061.0
+    assert budget.should_stop() is True
+
+
+def test_agent_engines_priced_zero():
+    import loom.budget as b
+    u = b.Usage(input_tokens=1000, output_tokens=1000)
+    assert u.cost("claude", b.PRICING) == 0.0
+    assert u.cost("codex", b.PRICING) == 0.0
