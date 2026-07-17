@@ -37,7 +37,8 @@ class _Completions:
         else:  # codex
             argv = ["codex", "exec", "--sandbox", "read-only", prompt]
         try:
-            proc = self.runner(argv, capture_output=True, text=True, timeout=self.timeout)
+            proc = self.runner(argv, capture_output=True, text=True,
+                               timeout=self.timeout, stdin=subprocess.DEVNULL)
             content = (proc.stdout or "").strip() if proc.returncode == 0 else "{}"
         except (subprocess.TimeoutExpired, FileNotFoundError):
             content = "{}"

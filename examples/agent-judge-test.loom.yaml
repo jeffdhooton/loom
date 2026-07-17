@@ -1,0 +1,23 @@
+name: agent-judge-test
+goal: Fix the add() function in calc.py so it returns a + b instead of a - b.
+type: coding
+workspace:
+  repo: examples/sandbox
+  worktree: true
+  branch: loop/agent-judge-test
+execute:
+  engine: claude
+  model: claude
+verify:
+  gate: judge
+  judge_engine: codex
+  judge_model: codex
+  rubric: examples/rubric-addfix.md
+  pass_threshold: 0.8
+stop:
+  max_iters: 3
+  wall_clock_secs: 900
+deliver:
+  artifact: "@diff"
+  push: false
+  pr: false
