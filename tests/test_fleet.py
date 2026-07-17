@@ -89,3 +89,20 @@ def test_run_fleet_stop_sentinel_skips_unstarted(tmp_path, monkeypatch):
     result = fleet.run_fleet(str(fp), run_loop=fake_run_loop)
     assert any(v == "skipped" for v in result.values())
     assert calls["n"] < len(names)  # not all members ran
+
+
+def test_fleet_status_renders_from_state(tmp_path, monkeypatch):
+    import json
+    from loom import fleet
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(fleet, "_runs_root", lambda: runs)
+    monkeypatch.setattr("loom.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem))
+    (runs / "m0").mkdir(parents=True)
+    (runs / "m0" / "state.json").write_text(json.dumps(
+        {"name": "m0", "status": "passed", "iters": [{"n": 1}], "spent_usd": 0.0}))
+    fp, _ = _make_fleet(tmp_path, n=2, concurrency=2)  # m0 ran, m1 pending
+    out = fleet.fleet_status(str(fp))
+    assert "m0" in out and "passed" in out
+    assert "m1" in out and "pending" in out
+    assert (tmp_path / "runs").parent.joinpath("fleets", "f", "status.md").exists()

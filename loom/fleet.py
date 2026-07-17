@@ -94,3 +94,24 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
         print(f"loom fleet: STOP sentinel detected — skipped {skipped} unstarted member(s)")
 
     return results
+
+
+def fleet_status(fleet_path: str) -> str:
+    import json
+    fs = load_fleet(fleet_path)
+    runs_root = _runs_root()
+    lines = [f"# fleet {fs.name}", "", f"{'member':30} {'status':16} {'iters':>6} {'spend':>8}"]
+    for member in fs.members:
+        name = member.stem.replace(".loom", "")
+        sp = runs_root / name / "state.json"
+        if sp.exists():
+            s = json.loads(sp.read_text())
+            lines.append(f"{name:30} {s.get('status','?'):16} "
+                         f"{len(s.get('iters', [])):>6} ${s.get('spent_usd', 0):>7.2f}")
+        else:
+            lines.append(f"{name:30} {'pending':16} {0:>6} ${0:>7.2f}")
+    text = "\n".join(lines) + "\n"
+    out_dir = runs_root.parent / "fleets" / fs.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "status.md").write_text(text)
+    return text
