@@ -108,3 +108,46 @@ def test_cycle_no_progress_bailout(tmp_path):
     state = cyc.run(cwd=tmp_path)
     assert state.status == "stopped"
     assert len(state.iters) == 3  # bailed after 3 no-progress iters
+
+
+def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
+    # A cycle whose abort_check() is True stops immediately with status "stopped".
+    from types import SimpleNamespace
+    from loom.cycle import Cycle
+    from loom.memory import Memory
+    from loom.budget import Budget, PRICING
+
+    class _Gate:
+        def verify(self, cwd, on_event):  # never reached
+            from loom.gates import GateResult
+            return GateResult(passed=True, feedback="", score=1.0)
+
+    class _Exec:
+        def execute(self, **kw):
+            from loom.budget import Usage
+            from loom.executor.base import ExecuteResult
+            return ExecuteResult(text="", usage=Usage(), steps=[])
+
+    class _UI:
+        def stage(self, *a): ...
+        def tool(self, *a): ...
+        def verify(self, *a): ...
+        def header(self, *a): ...
+        def summary(self, *a): ...
+
+    spec = SimpleNamespace(
+        name="ab", goal="g",
+        context=SimpleNamespace(notes="", files=[], scry=False),
+        execute=SimpleNamespace(plan_model="m", model="m", engine="claude",
+                                tools=["read"]),
+        stop=SimpleNamespace(max_iters=5, no_progress_after=None),
+        workspace=SimpleNamespace(repo=tmp_path),
+    )
+    from loom.executor.agent_plan import AgentPlanClient
+    mem = Memory("ab", root=tmp_path / "runs")
+    budget = Budget(None, None, PRICING)
+    cyc = Cycle(spec, _Exec(), _Gate(), mem, budget, _UI(), AgentPlanClient(),
+                abort_check=lambda: True)
+    state = cyc.run(cwd=tmp_path)
+    assert state.status == "stopped"
+    assert len(state.iters) == 0

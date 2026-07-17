@@ -33,8 +33,7 @@ def _build_plan_client(spec):
     return make_deepseek_client()
 
 
-def cmd_run(spec_path: str, fresh: bool = False) -> int:
-    from loom.spec import load_spec
+def run_loop(spec, *, fresh: bool = False, ui=None, abort_check=None):
     from loom.workspace import prepare_workspace
     from loom.budget import Budget, PRICING
     from loom.memory import Memory
@@ -43,7 +42,6 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
     from loom.ui import StreamUI
     from loom.cycle import Cycle
 
-    spec = load_spec(spec_path)
     memory = Memory(spec.name, root=_runs_root())
     if fresh:
         import shutil
@@ -52,7 +50,8 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
 
     budget = Budget(spec.budget.max_usd, spec.budget.max_tokens, PRICING,
                      wall_clock_secs=spec.stop.wall_clock_secs)
-    ui = StreamUI(name=spec.name, budget=budget)
+    if ui is None:
+        ui = StreamUI(name=spec.name, budget=budget)
     ui.header()
 
     judge_client = (make_judge_client(spec.verify.judge_model, engine=spec.verify.judge_engine)
@@ -63,7 +62,8 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
 
     cwd, wt = prepare_workspace(spec)
     try:
-        cycle = Cycle(spec, executor, gate, memory, budget, ui, plan_client)
+        cycle = Cycle(spec, executor, gate, memory, budget, ui, plan_client,
+                      abort_check=abort_check)
         state = cycle.run(cwd=cwd)
 
         # deliver() must run while `cwd` still exists — a worktree cwd is
@@ -82,6 +82,13 @@ def cmd_run(spec_path: str, fresh: bool = False) -> int:
     finally:
         if wt is not None:
             wt.cleanup()
+    return state
+
+
+def cmd_run(spec_path: str, fresh: bool = False) -> int:
+    from loom.spec import load_spec
+    spec = load_spec(spec_path)
+    state = run_loop(spec, fresh=fresh)
     return 0 if state.status == "passed" else 2
 
 
