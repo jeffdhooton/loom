@@ -283,3 +283,8 @@ the one genuine pre-first-run gate. Plus these non-blocking follow-up nits:
    `argv[1:3]`; smoke script `set -e` echo + BSD `sed`; a single agent turn
    (`timeout` default 1800s) can overrun a smaller `wall_clock_secs` (soft,
    between-iteration cap).
+
+**Next session — resume here:** the live test (real `claude -p`/`codex exec`
+flags + headless auth, then a real single-loop run) and Phase B (fleet
+supervisor + portable `loop` skill + scribe fleet) are laid out step-by-step in
+`~/dotfiles/docs/superpowers/2026-07-17-loom-resume-and-phase-b-handoff.md`.
