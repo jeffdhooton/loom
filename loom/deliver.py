@@ -4,10 +4,13 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# loom never deploys — deploys are manual (see repo CLAUDE.md). Any emitted
-# command whose joined string contains one of these phrases is refused before
-# it reaches the runner.
-DENYLIST: tuple[str, ...] = ("fly deploy", "deploy")
+# loom never deploys and never merges — deploys are manual (see repo
+# CLAUDE.md), merges are human-reviewed. deliver() only ever legitimately
+# emits git/gh/gog commands, so the guard is a structural allow-list on the
+# command verb (argv[0]), not a substring scan of free-text arguments (PR
+# titles/bodies and commit messages are derived from spec.goal and must not
+# be able to trip a text-based denylist).
+ALLOWED_VERBS: tuple[str, ...] = ("git", "gh", "gog")
 
 
 @dataclass
@@ -18,22 +21,22 @@ class DeliverResult:
     actions: list[str] = field(default_factory=list)
 
 
-def _check_denylist(argv: list[str]) -> None:
-    joined = " ".join(str(a) for a in argv)
-    for phrase in DENYLIST:
-        if phrase in joined:
-            raise ValueError(f"refusing to emit command containing denylisted phrase {phrase!r}: {joined}")
+def _check_allowed_verb(argv: list[str]) -> None:
+    verb = argv[0] if argv else None
+    if verb not in ALLOWED_VERBS:
+        joined = " ".join(str(a) for a in argv)
+        raise ValueError(f"refusing to emit command with disallowed verb {verb!r}: {joined}")
 
 
 def _check_no_merge(argv: list[str]) -> None:
-    joined = " ".join(str(a) for a in argv)
-    if "pr merge" in joined or (len(argv) >= 2 and argv[0] == "gh" and argv[1] == "merge"):
+    if argv and argv[0] == "gh" and "merge" in argv[1:3]:
+        joined = " ".join(str(a) for a in argv)
         raise ValueError(f"refusing to emit a merge command: {joined}")
 
 
 def _run(runner, argv: list[str], cwd: Path):
+    _check_allowed_verb(argv)
     _check_no_merge(argv)
-    _check_denylist(argv)
     return runner(argv, cwd=str(cwd), capture_output=True, text=True)
 
 

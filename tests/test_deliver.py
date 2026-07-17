@@ -65,3 +65,35 @@ def test_deliver_merge_flag_is_refused(tmp_path):
     with pytest.raises(ValueError, match="merge"):
         deliver(_spec({"merge": True}), tmp_path, _passed_state(),
                 runner=lambda a, **k: _FakeCompleted(0, ""))
+
+
+def test_deliver_goal_containing_deploy_word_still_delivers(tmp_path):
+    # Regression: the guard scanned the whole joined argv string, which
+    # includes the commit message and PR title/body derived from spec.goal.
+    # A goal containing the word "deploy" (not a deploy command) must not
+    # trip the guard and abort delivery.
+    from loom.deliver import deliver
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        if argv[:3] == ["gh", "pr", "create"]:
+            return _FakeCompleted(0, "https://github.com/x/y/pull/43\n")
+        return _FakeCompleted(0, "")
+
+    spec = _spec({"push": True, "pr": True})
+    spec.goal = "fix the deploy pipeline docs"
+    res = deliver(spec, tmp_path, _passed_state(), runner=fake_run)
+    assert res.delivered is True
+    assert res.pr_url == "https://github.com/x/y/pull/43"
+
+
+def test_guards_refuse_real_deploy_and_merge_commands():
+    import pytest
+    from loom.deliver import _check_allowed_verb, _check_no_merge
+
+    with pytest.raises(ValueError):
+        _check_allowed_verb(["fly", "deploy", "-c", "x"])
+
+    with pytest.raises(ValueError):
+        _check_no_merge(["gh", "pr", "merge", "42"])
