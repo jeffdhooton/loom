@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import concurrent.futures
+import threading
+from pathlib import Path
+
+from loom.__main__ import _runs_root, run_loop as _default_run_loop
+from loom.fleet_spec import load_fleet
+from loom.ui import NullUI
+
+
+def stop_sentinel_path() -> Path:
+    return _runs_root().parent / "STOP"
+
+
+def _member_name(member_path: Path) -> str:
+    # member paths look like ".../<name>.loom.yaml"; strip both suffixes.
+    return member_path.stem.replace(".loom", "")
+
+
+def _run_member(member_path: Path, fresh: bool, run_loop) -> str:
+    from loom.spec import load_spec
+
+    sentinel = stop_sentinel_path()
+    try:
+        spec = load_spec(str(member_path))
+    except Exception:
+        return "error"
+    try:
+        state = run_loop(spec, fresh=fresh, ui=NullUI(),
+                          abort_check=lambda: sentinel.exists())
+        return getattr(state, "status", "error")
+    except Exception:
+        return "error"
+
+
+def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[str, str]:
+    """Run every member of a fleet spec in a bounded thread pool.
+
+    Each member is fully isolated (its own worktree via `prepare_workspace`),
+    so threads are safe here even though agent turns are subprocesses.
+
+    STOP semantics: a stale sentinel from a previous run is cleared at the
+    start of every `run_fleet` call. If a member's run_loop (or an external
+    actor) re-creates the sentinel while the fleet is in flight, in-progress
+    members keep running until their own `abort_check` trips (they exit at
+    the next iteration boundary, bounded by max_iters/wall_clock_secs) but
+    no *new* member is submitted -- it is recorded as "skipped" instead.
+    """
+    run_loop = run_loop or _default_run_loop
+    fs = load_fleet(fleet_path)
+    sentinel = stop_sentinel_path()
+    if sentinel.exists():
+        sentinel.unlink()  # clear a stale sentinel so a fresh fleet is not blocked
+
+    results: dict[str, str] = {}
+    skipped = 0
+
+    # ThreadPoolExecutor.submit() enqueues work immediately regardless of
+    # worker availability -- it does not block until a slot is actually
+    # free. If members were submitted in a tight, unthrottled loop, the
+    # STOP check ahead of member N+1 would race against member N's
+    # *execution* (thread start + run_loop) rather than reflecting
+    # completed work, which would make the "skip unstarted members"
+    # behavior nondeterministic. A semaphore sized to `concurrency` gives
+    # real backpressure: the next member is only considered for
+    # submission once an in-flight slot has genuinely been released by a
+    # completed run_loop call, so the STOP check is meaningful.
+    sem = threading.Semaphore(fs.concurrency)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=fs.concurrency) as ex:
+        futures: dict[concurrent.futures.Future, str] = {}
+
+        def wrapped(member_path: Path) -> str:
+            try:
+                return _run_member(member_path, fresh, run_loop)
+            finally:
+                sem.release()
+
+        for member in fs.members:
+            sem.acquire()
+            name = _member_name(member)
+            if sentinel.exists():
+                sem.release()
+                results[name] = "skipped"
+                skipped += 1
+                continue
+            futures[ex.submit(wrapped, member)] = name
+
+        for fut in concurrent.futures.as_completed(futures):
+            results[futures[fut]] = fut.result()
+
+    if skipped:
+        print(f"loom fleet: STOP sentinel detected — skipped {skipped} unstarted member(s)")
+
+    return results
