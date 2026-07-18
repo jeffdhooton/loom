@@ -23,8 +23,14 @@ def load_fleet(path: str) -> FleetSpec:
         raise ValueError("fleet spec requires a non-empty members list")
     base = p.parent
     members = [(base / m).expanduser().resolve() for m in members_raw]
+    c = raw.get("concurrency", 4)
+    if c is None:
+        c = 4  # explicit null → default
+    c = int(c)
+    if c < 1:
+        raise ValueError("fleet concurrency must be >= 1")
     return FleetSpec(
         name=raw["name"],
         members=members,
-        concurrency=int(raw.get("concurrency", 4)),
+        concurrency=c,
     )

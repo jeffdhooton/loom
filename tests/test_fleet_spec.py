@@ -31,3 +31,26 @@ def test_load_fleet_requires_members(tmp_path):
     fp.write_text("name: f\nmembers: []\n")
     with pytest.raises(ValueError, match="members"):
         load_fleet(str(fp))
+
+
+def test_load_fleet_rejects_zero_concurrency(tmp_path):
+    from loom.fleet_spec import load_fleet
+    fp = tmp_path / "fleet.yaml"
+    fp.write_text("name: f\nconcurrency: 0\nmembers:\n  - a.loom.yaml\n")
+    with pytest.raises(ValueError, match="concurrency"):
+        load_fleet(str(fp))
+
+
+def test_load_fleet_rejects_negative_concurrency(tmp_path):
+    from loom.fleet_spec import load_fleet
+    fp = tmp_path / "fleet.yaml"
+    fp.write_text("name: f\nconcurrency: -1\nmembers:\n  - a.loom.yaml\n")
+    with pytest.raises(ValueError, match="concurrency"):
+        load_fleet(str(fp))
+
+
+def test_load_fleet_null_concurrency_defaults_to_4(tmp_path):
+    from loom.fleet_spec import load_fleet
+    fp = tmp_path / "fleet.yaml"
+    fp.write_text("name: f\nconcurrency:\nmembers:\n  - a.loom.yaml\n")
+    assert load_fleet(str(fp)).concurrency == 4

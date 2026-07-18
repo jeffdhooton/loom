@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import concurrent.futures
+import sys
 import threading
+import traceback
 from pathlib import Path
 
 from loom.__main__ import _runs_root, run_loop as _default_run_loop
@@ -44,6 +46,8 @@ def _run_member(member_path: Path, fresh: bool, run_loop) -> tuple[str, str]:
                           abort_check=lambda: sentinel.exists())
         return spec.name, getattr(state, "status", "error")
     except Exception:
+        print(f"loom fleet: member {spec.name} failed:\n{traceback.format_exc()}",
+              file=sys.stderr)
         return spec.name, "error"
 
 
@@ -62,9 +66,23 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
     """
     run_loop = run_loop or _default_run_loop
     fs = load_fleet(fleet_path)
+
+    # Each member's run state lives at ~/.loom/runs/<run-name>/. If two
+    # members resolve to the same run name, they'd race the same
+    # state.json/log.md (and --fresh could rmtree one mid-run) -- fail fast
+    # before submitting any work.
+    run_names = [_run_name(member) for member in fs.members]
+    seen: set[str] = set()
+    dups: set[str] = set()
+    for n in run_names:
+        if n in seen:
+            dups.add(n)
+        seen.add(n)
+    if dups:
+        raise ValueError(f"fleet has duplicate member names: {sorted(dups)}")
+
     sentinel = stop_sentinel_path()
-    if sentinel.exists():
-        sentinel.unlink()  # clear a stale sentinel so a fresh fleet is not blocked
+    sentinel.unlink(missing_ok=True)  # clear a stale sentinel so a fresh fleet is not blocked
 
     results: dict[str, str] = {}
     skipped = 0

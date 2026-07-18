@@ -5,6 +5,8 @@ from pathlib import Path
 
 from types import SimpleNamespace
 
+import pytest
+
 
 def _make_fleet(tmp_path, n=4, concurrency=2):
     names = []
@@ -144,3 +146,65 @@ def test_fleet_keys_by_spec_name_not_filename_stem(tmp_path, monkeypatch):
 
     result = fleet.run_fleet(str(fp), run_loop=fake_run_loop)
     assert result == {"CS-100": "passed"}
+
+
+def test_run_fleet_raises_on_duplicate_member_names(tmp_path, monkeypatch):
+    """Two members that resolve to the same spec name would race the same
+    ~/.loom/runs/<name>/ state — fail fast instead of corrupting state."""
+    from loom import fleet
+    monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
+    monkeypatch.setattr("loom.spec.load_spec",
+                        lambda p: SimpleNamespace(name="dup"))
+
+    fp, names = _make_fleet(tmp_path, n=2, concurrency=2)
+
+    def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
+        return SimpleNamespace(status="passed")
+
+    with pytest.raises(ValueError, match="dup"):
+        fleet.run_fleet(str(fp), run_loop=fake_run_loop)
+
+
+def test_run_fleet_member_run_loop_error_isolated(tmp_path, monkeypatch):
+    """A single member's run_loop raising must not crash the fleet -- the
+    other members still run and the fleet returns a full status dict."""
+    from loom import fleet
+    monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
+    monkeypatch.setattr("loom.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+
+    def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
+        if spec.name == "m0":
+            raise RuntimeError("boom")
+        return SimpleNamespace(status="passed")
+
+    fp, names = _make_fleet(tmp_path, n=3, concurrency=2)
+    result = fleet.run_fleet(str(fp), run_loop=fake_run_loop)
+    assert set(result) == set(names)
+    assert result["m0"] == "error"
+    assert result["m1"] == "passed"
+    assert result["m2"] == "passed"
+
+
+def test_run_fleet_member_load_spec_error_isolated(tmp_path, monkeypatch):
+    """A single member with an unparseable spec must not crash the fleet --
+    it is recorded as 'error' while the other members complete normally."""
+    from loom import fleet
+    monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
+
+    def fake_load_spec(p):
+        if Path(p).name == "m0.loom.yaml":
+            raise ValueError("unparseable spec")
+        return SimpleNamespace(name=Path(p).stem.replace(".loom", ""))
+
+    monkeypatch.setattr("loom.spec.load_spec", fake_load_spec)
+
+    def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
+        return SimpleNamespace(status="passed")
+
+    fp, names = _make_fleet(tmp_path, n=3, concurrency=2)
+    result = fleet.run_fleet(str(fp), run_loop=fake_run_loop)
+    assert set(result) == set(names)
+    assert result["m0"] == "error"
+    assert result["m1"] == "passed"
+    assert result["m2"] == "passed"
