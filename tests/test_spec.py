@@ -148,6 +148,44 @@ def test_deliver_branch_main_rejected(tmp_path):
         load_spec(str(p))
 
 
+def test_agent_engine_without_model_defaults_to_engine_sentinel(tmp_path):
+    # Regression: engine:claude with no execute.model must NOT inherit the
+    # deepseek default ("deepseek-v4-flash"), which the claude CLI rejects with
+    # a 404. It must default to the "claude" sentinel so _claude_argv omits --model.
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: claude\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    assert load_spec(str(p)).execute.model == "claude"
+
+
+def test_agent_engine_respects_explicit_model(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "execute:\n  engine: codex\n  model: gpt-5.6-sol\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    assert load_spec(str(p)).execute.model == "gpt-5.6-sol"
+
+
+def test_deepseek_engine_keeps_default_model(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: content\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    assert load_spec(str(p)).execute.model == "deepseek-v4-flash"
+
+
 def test_deliver_base_equal_branch_rejected(tmp_path):
     import pytest
     from loom.spec import load_spec

@@ -101,9 +101,15 @@ def load_spec(path: str) -> LoopSpec:
     engine = ex_raw.get("engine", "deepseek")
     if engine not in VALID_ENGINES:
         raise ValueError(f"execute.engine must be one of {sorted(VALID_ENGINES)}")
+    # Agent engines shell the `claude`/`codex` CLI, whose --model rejects a
+    # deepseek model id (404). When such a spec omits execute.model, default it
+    # to the engine sentinel ("claude"/"codex") so _claude_argv/_codex_argv omit
+    # --model and the CLI uses its own configured default. Only the deepseek
+    # engine keeps the deepseek default.
+    default_model = engine if engine in {"claude", "codex"} else "deepseek-v4-flash"
     execute = ExecuteCfg(
         plan_model=ex_raw.get("plan_model", "deepseek-v4-pro"),
-        model=ex_raw.get("model", "deepseek-v4-flash"),
+        model=ex_raw.get("model", default_model),
         engine=engine,
         tools=list(ex_raw.get("tools") or ["read", "write", "edit", "bash"]),
     )
