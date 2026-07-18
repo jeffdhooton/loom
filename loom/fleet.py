@@ -40,6 +40,8 @@ def _run_member(member_path: Path, fresh: bool, run_loop) -> tuple[str, str]:
     try:
         spec = load_spec(str(member_path))
     except Exception:
+        print(f"loom fleet: member {member_path.name} failed to load:\n{traceback.format_exc()}",
+              file=sys.stderr)
         return _member_name(member_path), "error"
     try:
         state = run_loop(spec, fresh=fresh, ui=NullUI(),
