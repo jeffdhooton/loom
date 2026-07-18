@@ -18,3 +18,14 @@ def test_ui_renders_without_error(capsys):
     assert "EXECUTE" in out
     assert "demo" in out
     assert "passed" in out.lower()
+
+
+def test_null_ui_is_silent(capsys):
+    from loom.ui import NullUI
+    ui = NullUI()
+    ui.header()
+    ui.stage("EXECUTE", 1, 3)
+    ui.tool("read", {"path": "x"})
+    ui.verify(object())
+    ui.summary(object())
+    assert capsys.readouterr().out == ""

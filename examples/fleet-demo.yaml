@@ -1,0 +1,5 @@
+name: demo
+concurrency: 2
+members:
+  - agent-coding.loom.yaml
+  - agent-coding-b.loom.yaml

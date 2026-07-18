@@ -26,7 +26,7 @@ complete, stop and briefly state what you did. Do not ask questions."""
 
 class Cycle:
     def __init__(self, spec, executor, gate, memory: Memory, budget: Budget, ui,
-                 plan_client):
+                 plan_client, abort_check=None):
         self.spec = spec
         self.executor = executor
         self.gate = gate
@@ -34,6 +34,7 @@ class Cycle:
         self.budget = budget
         self.ui = ui
         self.plan_client = plan_client
+        self.abort_check = abort_check
 
     def _discover(self) -> str:
         parts = [self.spec.context.notes] if self.spec.context.notes else []
@@ -71,6 +72,10 @@ class Cycle:
             n = prior + i  # persistent record label; `i` is the per-run counter (UI/cap)
             if self.budget.should_stop():
                 self.memory.set_status("budget_exhausted")
+                break
+
+            if self.abort_check is not None and self.abort_check():
+                self.memory.set_status("stopped")
                 break
 
             # DISCOVER

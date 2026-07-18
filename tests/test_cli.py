@@ -77,3 +77,43 @@ def test_build_executor_selects_engine(tmp_path, monkeypatch):
     assert isinstance(m._build_executor(spec_with("claude")), ClaudeExecutor)
     assert isinstance(m._build_executor(spec_with("codex")), CodexExecutor)
     assert isinstance(m._build_plan_client(spec_with("claude")), AgentPlanClient)
+
+
+def test_run_loop_is_reused_by_cmd_run(monkeypatch, tmp_path):
+    # cmd_run delegates to run_loop and maps status to an exit code.
+    from loom import __main__ as m
+    from loom.memory import RunState
+
+    called = {}
+
+    def fake_load_spec(path):
+        called["path"] = path
+        return object()
+
+    def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
+        called["fresh"] = fresh
+        return RunState(name="x", status="passed")
+
+    monkeypatch.setattr("loom.spec.load_spec", fake_load_spec)
+    monkeypatch.setattr(m, "run_loop", fake_run_loop)
+    assert m.cmd_run("some.yaml", fresh=True) == 0
+    assert called["path"] == "some.yaml" and called["fresh"] is True
+
+
+def test_fleet_stop_creates_sentinel(monkeypatch, tmp_path):
+    from loom import __main__ as m
+    from loom import fleet
+    monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
+    assert m.main(["fleet", "stop"]) == 0
+    assert fleet.stop_sentinel_path().exists()
+
+
+def test_fleet_run_dispatches(monkeypatch, tmp_path):
+    from loom import __main__ as m
+    from loom import fleet
+    called = {}
+    monkeypatch.setattr(fleet, "run_fleet",
+                        lambda p, **k: called.setdefault("run", p) and {"a": "passed"})
+    monkeypatch.setattr(fleet, "fleet_status", lambda p: "STATUS")
+    rc = m.main(["fleet", "run", "f.yaml"])
+    assert rc == 0 and called["run"] == "f.yaml"

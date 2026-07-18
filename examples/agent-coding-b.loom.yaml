@@ -1,0 +1,22 @@
+name: agent-sandbox-fix-b
+goal: Make the failing pytest in the sandbox pass by fixing the bug in calc.py.
+type: coding
+workspace:
+  repo: examples/sandbox
+  worktree: true
+  branch: loop/agent-sandbox-fix-b
+execute:
+  engine: claude          # or: codex
+  model: claude
+verify:
+  gate: command
+  command: pytest -q
+stop:
+  max_iters: 4
+  wall_clock_secs: 900
+budget:
+  max_tokens: null        # subscription run — governed by iters + wall clock
+deliver:
+  push: false             # smoke: local only
+  pr: false
+  notify: true

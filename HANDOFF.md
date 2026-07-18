@@ -294,3 +294,86 @@ the one genuine pre-first-run gate. Plus these non-blocking follow-up nits:
 flags + headless auth, then a real single-loop run) and Phase B (fleet
 supervisor + portable `loop` skill + scribe fleet) are laid out step-by-step in
 `~/dotfiles/docs/superpowers/2026-07-17-loom-resume-and-phase-b-handoff.md`.
+
+## 11. Phase B — fleet supervisor (2026-07-17, branch `feat/fleet-supervisor`)
+
+Built via subagent-driven SDD (7 tasks; brief/report/spec-coverage per task at
+`.superpowers/sdd/task-*-brief.md`). Adds a fleet layer on top of the
+single-member `run_loop` engine: run N member specs concurrently, each in its
+own isolated worktree, with a shared kill switch and a live dashboard.
+`pytest -q` shows **97 passing** (was 78 after Phase A). Not yet merged to
+`main`.
+
+**What shipped:**
+- **`loom fleet run <fleet.yaml> [--fresh]`** (`loom/fleet.py::run_fleet`) —
+  loads a `FleetSpec` (`name`, `members: [...]`, `concurrency`), then runs
+  every member's `run_loop` inside a `ThreadPoolExecutor(max_workers=concurrency)`.
+  Threads are safe because each member gets its own worktree via the existing
+  `prepare_workspace`/`Worktree` machinery (Task 1/4) — no shared mutable
+  state between members beyond the fleet-level STOP sentinel and the shared
+  thread pool itself.
+- **Worktree-per-member isolation** — no new isolation code was needed; the
+  fleet layer reuses `run_loop`'s existing per-spec `workspace.worktree: true`
+  handling. Two members pointed at the *same* `workspace.repo` but different
+  `workspace.branch` values each get their own worktree + branch and cannot
+  see each other's edits (proved by Task 7's smoke, see below).
+- **`loom fleet stop`** + STOP sentinel (`fleet.stop_sentinel_path()` →
+  `~/.loom/STOP`) — v1 kill-switch semantics: writing the sentinel **halts
+  scheduling** (no new member is submitted; unstarted members are recorded as
+  `"skipped"`) and each in-flight member **aborts at its own next iteration
+  boundary** via `abort_check=lambda: sentinel.exists()` threaded through
+  `run_loop` → `Cycle` (`loom/cycle.py`, checked once per iteration). This is
+  **not** a hard kill of in-flight agent subprocesses — a running `claude -p`
+  / `codex exec` call is allowed to finish its current turn (bounded by the
+  member's own `stop.wall_clock_secs`/timeout) before the loop notices the
+  sentinel and exits. A stale sentinel from a previous run is cleared at the
+  start of every `run_fleet()` call so a fresh fleet is never pre-blocked.
+- **`loom fleet status <fleet.yaml>`** (`fleet.fleet_status`) — renders a
+  table (member, status, iters, spend) from each member's `~/.loom/runs/<name>/state.json`
+  and writes it to `~/.loom/fleets/<fleet-name>/status.md` as a durable
+  dashboard.
+- **Backpressure via semaphore** — `run_fleet` uses a `threading.Semaphore(concurrency)`
+  ahead of `ThreadPoolExecutor.submit()` so the STOP check before submitting
+  member N+1 reflects genuinely completed work (a released slot), not just
+  "enqueued" work — otherwise the skip-unstarted-members behavior would be
+  racy/nondeterministic.
+
+**Key files:** `loom/fleet.py` (`run_fleet`, `fleet_status`, `stop_sentinel_path`,
+`_member_name`, `_run_member`), `loom/fleet_spec.py` (`FleetSpec`, `load_fleet`),
+`loom/__main__.py::cmd_fleet` (`fleet run|status|stop` dispatch) — plus the
+`run_loop`/`Cycle` `abort_check` parameter added in Task 1 and reused here
+unchanged. `examples/fleet-demo.yaml`, `examples/agent-coding-b.loom.yaml`,
+`scripts/fleet-smoke.sh` (Task 7).
+
+**Task 7 smoke (offline, no real model):** `scripts/fleet-smoke.sh` puts a
+stub `claude` on `PATH` (same shape as Phase A's `agent-smoke.sh`), resets
+the sandbox bug, prunes stale worktrees, then runs `loom fleet run
+examples/fleet-demo.yaml --fresh` — two members (`agent-coding.loom.yaml`
+and `agent-coding-b.loom.yaml`) pointed at the **same** `examples/sandbox`
+repo but **different** branches (`loop/agent-sandbox-fix` /
+`loop/agent-sandbox-fix-b`). Confirmed live: both members ran in parallel,
+each got its own worktree, the stub fixed each worktree's own `calc.py`
+independently, both delivered — `loop/agent-sandbox-fix` and
+`loop/agent-sandbox-fix-b` each carry the fix, `examples/sandbox` `main` is
+untouched, and both members' `~/.loom/runs/<name>/state.json` show
+`"status": "passed"`. This proves the isolation claim end to end.
+
+**Known bug found by the Task 7 smoke (not patched — Phase B code, out of
+scope for a smoke-test task):** `loom fleet status` printed `pending` for
+both members even though both had actually passed. Root cause:
+`fleet.py::_member_name()` (used by both `run_fleet`'s result dict and
+`fleet_status`'s per-member `state.json` lookup) derives the run's name from
+the **member YAML filename** (`member_path.stem.replace(".loom", "")` — e.g.
+`agent-coding.loom.yaml` → `"agent-coding"`), but `run_loop`/`Memory` actually
+key each run's `~/.loom/runs/<name>/` directory by the spec's **declared
+`name:` field** (loaded via `load_spec`), which is not required to match the
+filename — and doesn't, for the existing `agent-coding.loom.yaml`
+(`name: agent-sandbox-fix`) and the new `agent-coding-b.loom.yaml`
+(`name: agent-sandbox-fix-b`). The existing unit tests
+(`tests/test_fleet.py`) don't catch this because every fixture there
+constructs `member.loom.yaml` files whose filename stem is made to equal the
+mocked spec's `name`, which never exercises the mismatch. **Fix (deferred to
+a follow-up task, not done here):** `fleet.py` should `load_spec(member_path)`
+and use `spec.name` (with a fallback to the filename if the load fails) for
+both the `run_fleet()` result-dict key and the `fleet_status()` lookup,
+instead of `_member_name()`'s filename-only derivation.
