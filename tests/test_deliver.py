@@ -114,6 +114,45 @@ def test_deliver_stopped_writes_report_to_durable_report_dir(tmp_path):
     assert "2 tests fail" in report_path.read_text()
 
 
+def test_deliver_pr_defaults_base_to_main(tmp_path):
+    from loom.deliver import deliver
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        if argv[:3] == ["gh", "pr", "create"]:
+            return _FakeCompleted(0, "https://github.com/x/y/pull/44\n")
+        return _FakeCompleted(0, "")
+
+    deliver(_spec({"push": True, "pr": True}), tmp_path, _passed_state(), runner=fake_run)
+    pr = next(a for a in calls if a[:3] == ["gh", "pr", "create"])
+    assert pr[pr.index("--base") + 1] == "main"
+
+
+def test_deliver_pr_targets_configured_base(tmp_path):
+    from loom.deliver import deliver
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        if argv[:3] == ["gh", "pr", "create"]:
+            return _FakeCompleted(0, "https://github.com/x/y/pull/45\n")
+        return _FakeCompleted(0, "")
+
+    spec = _spec({"push": True, "pr": True, "base": "develop", "branch": "loop/CS-179"})
+    deliver(spec, tmp_path, _passed_state(), runner=fake_run)
+    pr = next(a for a in calls if a[:3] == ["gh", "pr", "create"])
+    assert pr[pr.index("--base") + 1] == "develop"
+
+
+def test_deliver_base_equal_to_branch_is_refused(tmp_path):
+    import pytest
+    from loom.deliver import deliver
+    with pytest.raises(ValueError, match="(?i)base"):
+        deliver(_spec({"branch": "develop", "base": "develop"}), tmp_path, _passed_state(),
+                runner=lambda a, **k: _FakeCompleted(0, ""))
+
+
 def test_guards_refuse_real_deploy_and_merge_commands():
     import pytest
     from loom.deliver import _check_allowed_verb, _check_no_merge

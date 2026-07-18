@@ -76,6 +76,14 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
         # through load_spec.
         raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
 
+    base = d.get("base") or "main"
+    if base.lower() == branch.lower():
+        # A PR whose base equals its head is degenerate; gh would reject it,
+        # but fail fast with a clear message. (base may legitimately be a
+        # non-trunk integration branch like `develop` — loom PRs *into* the
+        # base, it never pushes to it directly, so base is otherwise free.)
+        raise ValueError(f"deliver.base must differ from deliver.branch (both {base!r})")
+
     if state.status != "passed":
         return DeliverResult(delivered=False, report_path=_write_report(spec, cwd, state, report_dir))
 
@@ -93,7 +101,7 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
     if d.get("pr", True):
         body = (f"Autonomous loom run for {spec.name}.\n\n"
                  f"Goal: {spec.goal}\n\nVerifier + grader passed. Review before merge.")
-        proc = _run(runner, ["gh", "pr", "create", "--base", "main",
+        proc = _run(runner, ["gh", "pr", "create", "--base", base,
                              "--head", branch, "--title", f"{spec.name}: {spec.goal[:60]}",
                              "--body", body], cwd)
         pr_url = (proc.stdout or "").strip() or None

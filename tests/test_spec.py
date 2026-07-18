@@ -148,6 +148,33 @@ def test_deliver_branch_main_rejected(tmp_path):
         load_spec(str(p))
 
 
+def test_deliver_base_equal_branch_rejected(tmp_path):
+    import pytest
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "deliver:\n  branch: develop\n  base: develop\n"
+    )
+    with pytest.raises(ValueError, match="(?i)base"):
+        load_spec(str(p))
+
+
+def test_deliver_base_develop_accepted(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "deliver:\n  branch: loop/CS-179\n  base: develop\n"
+    )
+    spec = load_spec(str(p))
+    assert spec.deliver["base"] == "develop"
+
+
 def test_judge_engine_set_must_differ_from_execute_engine_regardless_of_model(tmp_path):
     import pytest
     from loom.spec import load_spec
