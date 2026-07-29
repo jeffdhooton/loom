@@ -26,6 +26,8 @@ def _run_one(key: str, val, text: str) -> CheckResult:
         return CheckResult("max_words", words <= val, f"{words} words (limit {val})")
     if key == "min_words":
         return CheckResult("min_words", words >= val, f"{words} words (min {val})")
+    if key in ("must_contain", "must_not_contain") and isinstance(val, str):
+        val = [val]
     if key == "must_contain":
         missing = [s for s in val if s not in text]
         return CheckResult("must_contain", not missing,

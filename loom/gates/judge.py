@@ -29,7 +29,7 @@ ARTIFACT:
 class JudgeGate(Gate):
     def __init__(self, client, model: str, rubric_text: str, threshold: float,
                  artifact: str | None, extra_body: dict | None = None,
-                 checks: list[dict] | None = None):
+                 checks: list[dict] | None = None, diff_base: str | None = None):
         self.client = client
         self.model = model
         self.rubric_text = rubric_text
@@ -37,10 +37,21 @@ class JudgeGate(Gate):
         self.artifact = artifact
         self.extra_body = extra_body
         self.checks = checks or []
+        self.diff_base = diff_base
 
     def _read_artifact(self, cwd: Path) -> str:
         if self.artifact == "@diff":
-            proc = subprocess.run(["git", "diff", "HEAD"], cwd=str(cwd),
+            # A maker that commits its work leaves `git diff HEAD` empty, so when a
+            # delivery base is known, grade everything since the branch forked from it
+            # (merge-base handles a base branch that has advanced). Diffing the
+            # worktree against that commit includes committed AND uncommitted work.
+            ref = "HEAD"
+            if self.diff_base:
+                mb = subprocess.run(["git", "merge-base", self.diff_base, "HEAD"],
+                                    cwd=str(cwd), capture_output=True, text=True)
+                if mb.returncode == 0 and mb.stdout.strip():
+                    ref = mb.stdout.strip()
+            proc = subprocess.run(["git", "diff", ref], cwd=str(cwd),
                                   capture_output=True, text=True)
             return proc.stdout or "[empty diff]"
         path = Path(self.artifact) if self.artifact else None

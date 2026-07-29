@@ -58,3 +58,10 @@ def test_agent_engines_priced_zero():
     u = b.Usage(input_tokens=1000, output_tokens=1000)
     assert u.cost("claude", b.PRICING) == 0.0
     assert u.cost("codex", b.PRICING) == 0.0
+
+
+def test_budget_remaining_secs():
+    b = Budget(None, None, PRICING, wall_clock_secs=100)
+    r = b.remaining_secs()
+    assert r is not None and 90 < r <= 100
+    assert Budget(None, None, PRICING).remaining_secs() is None

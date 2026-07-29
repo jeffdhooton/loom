@@ -128,3 +128,40 @@ def test_judge_gate_structured_criteria_can_fail_high_score(tmp_path):
     r = g.verify(cwd=tmp_path, on_event=lambda e: None)
     assert r.passed is False  # a self-reported failed criterion overrides the high score
     assert "under 400 words" in r.feedback
+
+
+def test_command_gate_keeps_tail_of_long_output(tmp_path):
+    # Test runners print the failure summary LAST — truncation must keep the tail.
+    g = CommandGate(command="python3 -c \"print('x'*20000); print('FAILED tail_marker')\"; exit 1")
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert r.passed is False
+    assert "tail_marker" in r.feedback
+    assert len(r.feedback) < 8000
+
+
+def test_command_gate_times_out(tmp_path):
+    import time
+    g = CommandGate(command="sleep 30", timeout=1)
+    t0 = time.monotonic()
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert time.monotonic() - t0 < 10
+    assert r.passed is False
+    assert r.timed_out is True
+    assert "timed out" in r.feedback
+
+
+def test_command_gate_timeout_bounds_orphaned_pipe_holder(tmp_path):
+    # A gate command that leaks a background child holding stdout must not
+    # hang the loop past the timeout, even though the shell itself exits 0.
+    import time
+    g = CommandGate(command="(sleep 30 &); echo started; exit 0", timeout=1)
+    t0 = time.monotonic()
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert time.monotonic() - t0 < 10
+    assert r.passed is False
+
+
+def test_command_gate_reports_returncode(tmp_path):
+    g = CommandGate(command="exit 127")
+    r = g.verify(cwd=tmp_path, on_event=lambda e: None)
+    assert r.returncode == 127

@@ -68,6 +68,24 @@ class Cycle:
         no_progress = 0
         prior = len(self.memory.load().iters)  # resume-aware: continue the spine's numbering
 
+        # PREFLIGHT: run a cheap gate once cold, before any work. A gate whose
+        # command can't even run (127/126) or that hangs cold can never pass —
+        # abort now instead of burning max_iters discovering it.
+        if (getattr(self.gate, "supports_preflight", False)
+                and getattr(getattr(self.spec, "verify", None), "preflight", True)):
+            self.ui.stage("PREFLIGHT", 0, self.spec.stop.max_iters)
+            pre = self.gate.verify(cwd=cwd, on_event=lambda e: None)
+            self.ui.verify(pre)
+            if pre.timed_out or pre.returncode in (126, 127):
+                self.memory.set_status("gate_error")
+                state = self.memory.load()
+                self.ui.summary(state)
+                return state
+            if not pre.passed:
+                # seed iter 1's PLAN with the cold failure instead of "has not run yet"
+                last = IterRecord(n=prior, plan="", summary="[preflight] gate run cold before any work",
+                                  passed=False, feedback=pre.feedback, usd=0.0, score=pre.score)
+
         for i in range(1, self.spec.stop.max_iters + 1):
             n = prior + i  # persistent record label; `i` is the per-run counter (UI/cap)
             if self.budget.should_stop():
@@ -89,6 +107,8 @@ class Cycle:
 
             # EXECUTE
             self.ui.stage("EXECUTE", i, self.spec.stop.max_iters)
+            if hasattr(self.executor, "set_deadline"):
+                self.executor.set_deadline(self.budget.remaining_secs())
             result = self.executor.execute(
                 system=_EXEC_SYSTEM.format(goal=self.spec.goal),
                 task=f"Working directory (all paths are relative to here): {cwd}\nPlan for this iteration:\n{plan}",

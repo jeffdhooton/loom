@@ -151,3 +151,88 @@ def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
     state = cyc.run(cwd=tmp_path)
     assert state.status == "stopped"
     assert len(state.iters) == 0
+
+
+class UnrunnableGate:
+    # exit 127: the verify command itself cannot run — not self-contained.
+    supports_preflight = True
+
+    def __init__(self):
+        self.calls = 0
+
+    def verify(self, cwd, on_event):
+        self.calls += 1
+        return GateResult(passed=False,
+                          feedback="sh: demo:verify: command not found",
+                          returncode=127)
+
+
+def test_preflight_aborts_on_unrunnable_gate(tmp_path):
+    ex = FakeExecutor()
+    cyc = Cycle(_spec(tmp_path), ex, UnrunnableGate(), Memory("t", root=tmp_path / "r"),
+                Budget(10.0, None, PRICING), StubUI(), _plan_client())
+    state = cyc.run(cwd=tmp_path)
+    assert state.status == "gate_error"
+    assert ex.calls == 0  # no iterations burned on a gate that can never pass
+
+
+def test_preflight_respects_spec_opt_out(tmp_path):
+    spec = _spec(tmp_path, max_iters=2)
+    spec.verify.preflight = False
+    gate = UnrunnableGate()
+    state = Cycle(spec, FakeExecutor(), gate, Memory("t", root=tmp_path / "r"),
+                  Budget(10.0, None, PRICING), StubUI(), _plan_client()).run(cwd=tmp_path)
+    assert state.status != "gate_error"
+    assert gate.calls == 2  # ran as normal iterations only
+
+
+def test_preflight_cold_feedback_seeds_first_plan(tmp_path):
+    prompts = []
+
+    def create(**kw):
+        prompts.append(kw["messages"][0]["content"])
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="plan"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1,
+                                  prompt_cache_hit_tokens=0))
+
+    plan_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+    class ColdFailGate:
+        supports_preflight = True
+
+        def __init__(self):
+            self.calls = 0
+
+        def verify(self, cwd, on_event):
+            self.calls += 1
+            if self.calls == 1:  # the cold preflight run
+                return GateResult(passed=False, feedback="ECONNREFUSED :5290",
+                                  returncode=1)
+            return GateResult(passed=True, feedback="ok", returncode=0)
+
+    cyc = Cycle(_spec(tmp_path), FakeExecutor(), ColdFailGate(),
+                Memory("t", root=tmp_path / "r"), Budget(10.0, None, PRICING),
+                StubUI(), plan_client)
+    state = cyc.run(cwd=tmp_path)
+    assert state.status == "passed"
+    assert "ECONNREFUSED" in prompts[0]  # iter-1 plan already sees the cold failure
+
+
+def test_cycle_passes_wall_clock_deadline_to_executor(tmp_path):
+    class DeadlineExec(FakeExecutor):
+        def __init__(self):
+            super().__init__()
+            self.deadlines = []
+
+        def set_deadline(self, remaining):
+            self.deadlines.append(remaining)
+
+    ex = DeadlineExec()
+    cyc = Cycle(_spec(tmp_path, max_iters=1), ex, FakeGate(pass_on_iter=1),
+                Memory("t", root=tmp_path / "r"),
+                Budget(None, None, PRICING, wall_clock_secs=100), StubUI(), _plan_client())
+    cyc.run(cwd=tmp_path)
+    assert len(ex.deadlines) == 1
+    assert ex.deadlines[0] is not None and 0 < ex.deadlines[0] <= 100

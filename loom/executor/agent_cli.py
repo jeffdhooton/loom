@@ -26,19 +26,29 @@ class AgentCLIExecutor(Executor):
         self.parse_fn = parse_fn
         self.timeout = timeout
         self.runner = runner
+        self._deadline_secs: float | None = None
+
+    def set_deadline(self, remaining_secs: float | None) -> None:
+        self._deadline_secs = remaining_secs
+
+    def _effective_timeout(self) -> int:
+        if self._deadline_secs is None:
+            return self.timeout
+        return max(1, min(self.timeout, int(self._deadline_secs)))
 
     def execute(self, system: str, task: str, tools: list[Tool], model: str,
                 cwd: Path, on_event: Callable[[ExecEvent], None]) -> ExecuteResult:
         prompt = f"{system}\n\n{task}"
         argv = self.argv_fn(prompt, cwd, model)
+        timeout = self._effective_timeout()
         on_event(ExecEvent("note", {"text": f"agent: {argv[0]} {argv[1] if len(argv) > 1 else ''}"}))
         try:
             proc = self.runner(argv, cwd=cwd, capture_output=True,
-                               text=True, timeout=self.timeout,
+                               text=True, timeout=timeout,
                                stdin=subprocess.DEVNULL)
         except subprocess.TimeoutExpired:
-            on_event(ExecEvent("note", {"text": f"agent timeout after {self.timeout}s"}))
-            return ExecuteResult(text=f"[agent timeout after {self.timeout}s]",
+            on_event(ExecEvent("note", {"text": f"agent timeout after {timeout}s"}))
+            return ExecuteResult(text=f"[agent timeout after {timeout}s]",
                                  usage=Usage(), steps=[])
         except FileNotFoundError as e:
             on_event(ExecEvent("note", {"text": f"agent binary not found: {argv[0]} ({e})"}))

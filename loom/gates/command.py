@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -7,19 +9,52 @@ from typing import Callable
 from . import Gate, GateResult
 
 _MAX = 6000
+_HEAD = 1500  # test runners print failures LAST — bias the kept window to the tail
+
+
+def _clip(out: str) -> str:
+    if len(out) <= _MAX:
+        return out
+    tail = _MAX - _HEAD
+    dropped = len(out) - _MAX
+    return out[:_HEAD] + f"\n…[{dropped} chars truncated]…\n" + out[-tail:]
 
 
 class CommandGate(Gate):
-    def __init__(self, command: str):
+    supports_preflight = True
+
+    def __init__(self, command: str, timeout: float = 600):
         self.command = command
+        self.timeout = timeout
 
     def verify(self, cwd: Path, on_event: Callable) -> GateResult:
         on_event({"kind": "verify_start", "command": self.command})
-        proc = subprocess.run(self.command, shell=True, cwd=cwd,
-                              capture_output=True, text=True)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if len(out) > _MAX:
-            out = out[:_MAX] + "\n…[truncated]"
+        # start_new_session + killpg: a leaked background child would otherwise
+        # hold the output pipe open and block communicate() past the shell's exit.
+        proc = subprocess.Popen(self.command, shell=True, cwd=cwd,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, start_new_session=True)
+        timed_out = False
+        try:
+            stdout, stderr = proc.communicate(timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            # start_new_session makes the shell the group leader (pgid == pid),
+            # so kill the group by pid — getpgid would fail once the shell has
+            # exited even while orphaned children still hold the pipe.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            stdout, stderr = proc.communicate()
+        out = _clip(((stdout or "") + (stderr or "")).strip())
+        if timed_out:
+            feedback = (f"verify command timed out after {self.timeout}s "
+                        "(hung, or left a background process holding its output pipe)")
+            if out:
+                feedback += f"\npartial output:\n{out}"
+            return GateResult(passed=False, feedback=feedback, timed_out=True)
         passed = proc.returncode == 0
         feedback = out if not passed else "all checks passed"
-        return GateResult(passed=passed, feedback=feedback or f"exit {proc.returncode}")
+        return GateResult(passed=passed, feedback=feedback or f"exit {proc.returncode}",
+                          returncode=proc.returncode)

@@ -42,6 +42,8 @@ class VerifyCfg:
     rubric: str | None = None
     pass_threshold: float = 0.8
     checks: list[dict] = field(default_factory=list)
+    timeout_secs: int = 600
+    preflight: bool = True
 
 
 @dataclass
@@ -129,6 +131,8 @@ def load_spec(path: str) -> LoopSpec:
         rubric=v_raw.get("rubric"),
         pass_threshold=float(v_raw.get("pass_threshold", 0.8)),
         checks=list(v_raw.get("checks") or []),
+        timeout_secs=int(v_raw.get("timeout_secs", 600)),
+        preflight=bool(v_raw.get("preflight", True)),
     )
     if gate == "command" and not verify.command:
         raise ValueError("command gate requires verify.command")
