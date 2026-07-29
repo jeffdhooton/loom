@@ -35,7 +35,8 @@ def build_gate(spec, judge_client=None) -> Gate:
     artifact = spec.deliver.get("artifact") if spec.deliver else None
     judge_model = spec.verify.judge_model
     extra_body = None if judge_model.startswith("deepseek") else {"reasoning_effort": "none"}
+    diff_base = spec.deliver.get("base") if spec.deliver else None
     return JudgeGate(client=judge_client, model=judge_model,
                      rubric_text=rubric_text, threshold=spec.verify.pass_threshold,
                      artifact=artifact, extra_body=extra_body,
-                     checks=spec.verify.checks)
+                     checks=spec.verify.checks, diff_base=diff_base)

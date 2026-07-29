@@ -27,3 +27,40 @@ def test_must_contain_and_not_contain():
 def test_unknown_check_is_skipped_as_pass():
     r = run_checks("x", [{"bogus": 1}])
     assert r[0].passed is True
+
+
+def test_contain_checks_accept_bare_strings():
+    # A bare string must be treated as one needle, not iterated char-by-char.
+    r = run_checks("alpha beta", [{"must_not_contain": "zeta"}])
+    assert all(c.passed for c in r)
+    r2 = run_checks("alpha beta", [{"must_contain": "alpha"}, {"must_not_contain": "beta"}])
+    assert [c.passed for c in r2] == [True, False]
+
+
+def test_judge_diff_uses_merge_base_when_maker_committed(tmp_path):
+    import subprocess
+    from loom.gates.judge import JudgeGate
+
+    def git(*args, cwd):
+        subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git("init", "-b", "develop", cwd=repo)
+    git("config", "user.email", "t@t", cwd=repo)
+    git("config", "user.name", "t", cwd=repo)
+    (repo / "f.txt").write_text("original\n")
+    git("add", "-A", cwd=repo)
+    git("commit", "-m", "base", cwd=repo)
+    git("checkout", "-b", "loop/x", cwd=repo)
+    (repo / "f.txt").write_text("changed\n")
+    git("commit", "-am", "maker work", cwd=repo)  # committed => `git diff HEAD` empty
+
+    gate = JudgeGate(client=None, model="m", rubric_text="r", threshold=0.8,
+                     artifact="@diff", diff_base="develop")
+    text = gate._read_artifact(repo)
+    assert "changed" in text  # sees committed work via merge-base
+
+    bare = JudgeGate(client=None, model="m", rubric_text="r", threshold=0.8,
+                     artifact="@diff")
+    assert bare._read_artifact(repo) == "[empty diff]"  # old HEAD-only behavior
