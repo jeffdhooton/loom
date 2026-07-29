@@ -2,7 +2,7 @@ name: stress-feature-hidden
 goal: "Implement romans.py so the hidden acceptance suite passes (`pytest` exit 0)."
 type: coding
 workspace:
-  repo: ~/workspace/loom/examples/stress-feature-sandbox
+  repo: examples/stress-feature-sandbox
   worktree: true
   branch: loom/stress-feature
 context:
@@ -30,7 +30,7 @@ execute:
   tools: [read, write, edit, search]
 verify:
   gate: command
-  command: "PYTHONPATH=. pytest ~/workspace/loom/examples/stress/hidden/test_romans.py -q"
+  command: "PYTHONPATH=. pytest examples/stress/hidden/test_romans.py -q"
 stop:
   max_iters: 8
   no_progress_after: 4

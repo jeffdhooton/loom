@@ -2,7 +2,7 @@ name: brief-loop-engineering
 goal: "Write out/brief.md: a tight brief on loop engineering that scores >= 0.8."
 type: content
 workspace:
-  repo: ~/workspace/loom/examples
+  repo: examples
   worktree: false
 context:
   notes: |
@@ -16,7 +16,7 @@ execute:
 verify:
   gate: judge
   judge_model: qwen3.6:27b
-  rubric: ~/workspace/loom/examples/rubric.md
+  rubric: examples/rubric.md
   pass_threshold: 0.8
   checks:
     - max_words: 400

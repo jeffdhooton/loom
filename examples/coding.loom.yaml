@@ -2,7 +2,7 @@ name: sandbox-fix-add
 goal: "`pytest -q` passes in the sandbox repo."
 type: coding
 workspace:
-  repo: ~/workspace/loom/examples/sandbox
+  repo: examples/sandbox
   worktree: true
   branch: loom/fix-add
 context:
