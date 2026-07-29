@@ -95,3 +95,31 @@ def test_codex_executor_falls_back_to_raw_text():
     assert "workspace-write" in captured["argv"]
     # never block reading stdin on an unattended run
     assert captured["stdin"] == subprocess.DEVNULL
+
+
+def test_agent_cli_clamps_timeout_to_deadline():
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured.update(kwargs)
+        return _FakeCompleted(0, json.dumps({"result": "done", "usage": {}}))
+
+    ex = ClaudeExecutor(timeout=1800, runner=fake_run)
+    ex.set_deadline(10)
+    ex.execute(system="SYS", task="TASK", tools=[], model="claude",
+               cwd=Path("/tmp/wt"), on_event=lambda e: None)
+    assert captured["timeout"] == 10
+
+
+def test_agent_cli_deadline_none_keeps_base_timeout():
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured.update(kwargs)
+        return _FakeCompleted(0, json.dumps({"result": "done", "usage": {}}))
+
+    ex = ClaudeExecutor(timeout=1800, runner=fake_run)
+    ex.set_deadline(None)
+    ex.execute(system="SYS", task="TASK", tools=[], model="claude",
+               cwd=Path("/tmp/wt"), on_event=lambda e: None)
+    assert captured["timeout"] == 1800

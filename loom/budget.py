@@ -48,6 +48,11 @@ class Budget:
         self.spent_usd += usage.cost(model, self.pricing)
         self.tokens += usage.input_tokens + usage.output_tokens
 
+    def remaining_secs(self) -> float | None:
+        if self.wall_clock_secs is None:
+            return None
+        return max(0.0, self.wall_clock_secs - (time.monotonic() - self._start))
+
     def should_stop(self) -> bool:
         if self.max_usd is not None and self.spent_usd >= self.max_usd:
             return True

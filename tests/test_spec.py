@@ -240,3 +240,30 @@ def test_judge_engine_cross_engine_still_loads(tmp_path):
     )
     s = load_spec(str(p))
     assert s.verify.judge_engine == "codex"
+
+
+def test_verify_timeout_and_preflight_parse(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+        "  timeout_secs: 120\n  preflight: false\n"
+    )
+    spec = load_spec(str(p))
+    assert spec.verify.timeout_secs == 120
+    assert spec.verify.preflight is False
+
+
+def test_verify_timeout_and_preflight_defaults(tmp_path):
+    from loom.spec import load_spec
+    p = tmp_path / "s.loom.yaml"
+    p.write_text(
+        "name: t\ngoal: g\ntype: coding\n"
+        "workspace:\n  repo: .\n"
+        "verify:\n  gate: command\n  command: 'true'\n"
+    )
+    spec = load_spec(str(p))
+    assert spec.verify.timeout_secs == 600
+    assert spec.verify.preflight is True
