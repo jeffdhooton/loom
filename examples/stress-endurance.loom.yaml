@@ -2,7 +2,7 @@ name: stress-endurance-giveup
 goal: "`pytest -q` passes (all tests green) in the endurance sandbox repo."
 type: coding
 workspace:
-  repo: ~/workspace/loom/examples/stress-endurance-sandbox
+  repo: examples/stress-endurance-sandbox
   worktree: true
   branch: loom/stress-endurance
 context:

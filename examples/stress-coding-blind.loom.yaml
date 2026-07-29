@@ -2,7 +2,7 @@ name: stress-coding-blind
 goal: "`pytest -q` passes (all tests green) in the blind sandbox repo."
 type: coding
 workspace:
-  repo: ~/workspace/loom/examples/stress-blind-sandbox
+  repo: examples/stress-blind-sandbox
   worktree: true
   branch: loom/stress-blind
 context:

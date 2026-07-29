@@ -2,7 +2,7 @@ name: stress-coding-multibug
 goal: "`pytest -q` passes (all tests green) in the stress sandbox repo."
 type: coding
 workspace:
-  repo: ~/workspace/loom/examples/stress-sandbox
+  repo: examples/stress-sandbox
   worktree: true
   branch: loom/stress-multibug
 context:

@@ -2,7 +2,7 @@ name: stress-content-selfcorrect
 goal: "Revise brief.md into a tight brief on loop engineering: 220-320 words, judge score >= 0.8."
 type: content
 workspace:
-  repo: ~/workspace/loom/examples/stress-out
+  repo: examples/stress-out
   worktree: false
 context:
   files: [brief.md]
@@ -20,7 +20,7 @@ execute:
 verify:
   gate: judge
   judge_model: qwen3.6:27b
-  rubric: ~/workspace/loom/examples/stress/content_rubric.md
+  rubric: examples/stress/content_rubric.md
   pass_threshold: 0.8
   checks:
     - max_words: 320

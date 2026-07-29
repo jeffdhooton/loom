@@ -1,9 +1,16 @@
 # loom
 
-A standalone DeepSeek-v4 closed-loop engine. Given a spec file, loom runs
-DISCOVER → PLAN → EXECUTE → VERIFY → ITERATE until the work passes its gate
-or hits a budget/iteration limit. Progress streams in real time and is
-watchable in tmux.
+A closed-loop engine for AI agents. Given a spec file, loom runs
+DISCOVER → PLAN → EXECUTE → VERIFY → ITERATE until the work passes a real,
+deterministic gate — or hits an iteration, budget, or wall-clock limit.
+Progress streams in real time and is watchable in tmux.
+
+The thesis: loops beat one-shot prompting, but only if the verify gate is
+real (an exit code, not vibes) and the loop is affordable. loom's default
+executor drives a cheap frontier-class model (DeepSeek-v4) through its own
+tool-calling loop; alternatively it shells out to the Claude Code or Codex
+CLI and lets that agent own the EXECUTE stage. Either way, the gate — not
+the model's self-assessment — decides when the work is done.
 
 ## Install
 
@@ -14,7 +21,8 @@ pip install -e ".[dev]"
 
 ## Setup
 
-Set `DEEPSEEK_API_KEY` (and `OPENAI_API_KEY` if using a judge gate):
+Set `DEEPSEEK_API_KEY` (only needed for the default deepseek engine — agent
+engines use your `claude`/`codex` CLI login instead):
 
 ```bash
 # Option A — shell export
@@ -25,14 +33,25 @@ cp .env.example .env
 # then edit .env
 ```
 
+## Quickstart
+
+```bash
+bash examples/setup.sh                 # create the sandbox: a repo with one failing test
+loom run examples/coding.loom.yaml     # watch the loop fix it until pytest passes
+```
+
 ## Usage
 
 ```bash
 loom run examples/coding.loom.yaml          # run a coding loop
 loom run examples/content.loom.yaml         # run a content loop
 loom run examples/coding.loom.yaml --fresh  # discard prior state and restart
+loom resume examples/coding.loom.yaml       # continue a stopped run (numbering continues)
 loom ls                                     # list all runs with status + spend
 loom logs <name>                            # print the markdown log for a run
+loom fleet run examples/fleet-demo.yaml     # run several loops as a supervised fleet
+loom fleet status examples/fleet-demo.yaml  # fleet dashboard (table + status.md)
+loom fleet stop                             # request a graceful fleet stop
 ```
 
 ## Loop specs
@@ -47,6 +66,32 @@ a budget cap.
 the output against a rubric and iterates until the score meets the threshold.
 `examples/agent-coding.loom.yaml` shows an agent-engine coding loop (see
 "Engines" below).
+
+### Command gates
+
+A command gate is a shell command whose exit code decides the iteration:
+
+```yaml
+verify:
+  gate: command
+  command: "pytest -q"
+  timeout_secs: 600     # optional; kills the whole process group on expiry
+  preflight: true       # optional (default); run the gate once cold before iter 1
+```
+
+Gate output fed back to the model is tail-biased — test runners print
+failures last, so the tail is what the next iteration needs to see. The
+gate runs in its own process session with a timeout, so a hung command (or
+one that leaks a background child holding the output pipe) fails the
+iteration instead of hanging the loop.
+
+**Preflight:** before iteration 1, loom runs the gate once, cold. A gate
+whose command can't even execute (exit 126/127) or that hangs cold can
+never pass, so the run aborts immediately with status `gate_error` rather
+than burning `max_iters` discovering it. A normal cold failure instead
+seeds the first PLAN with real feedback. The rule this enforces: **a gate
+must be self-contained** — runnable from a fresh checkout with no manually
+staged state.
 
 ### Engines
 
@@ -83,3 +128,14 @@ loom executes model-generated shell commands and file writes inside the
 configured workspace repo. Confinement is workspace-level (the cwd is set
 to the repo), not a strict sandbox. Run loom only on repos or worktrees you
 trust — treat it the same as running an AI coding agent on your machine.
+
+## Optional integrations
+
+If the [scry](https://github.com/jeffdhooton/scry) code-intelligence daemon
+is on your PATH, deepseek-engine loops can use it as a symbol-lookup tool
+(`tools: [..., scry]`); without it, the tool degrades gracefully and the
+loop falls back to plain search.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
