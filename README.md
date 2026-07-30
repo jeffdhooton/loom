@@ -1,5 +1,9 @@
 # loom
 
+[![tests](https://github.com/jeffdhooton/loom/actions/workflows/tests.yml/badge.svg)](https://github.com/jeffdhooton/loom/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![python](https://img.shields.io/badge/python-3.11%2B-blue)
+
 A closed-loop engine for AI agents. Given a spec file, loom runs
 DISCOVER → PLAN → EXECUTE → VERIFY → ITERATE until the work passes a real,
 deterministic gate — or hits an iteration, budget, or wall-clock limit.
@@ -13,6 +17,9 @@ CLI and lets that agent own the EXECUTE stage. Either way, the gate — not
 the model's self-assessment — decides when the work is done.
 
 ## Install
+
+macOS or Linux (loom manages gate subprocesses with POSIX process groups;
+Windows is not supported). Python 3.11+.
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
@@ -114,8 +121,9 @@ spec's `deliver:` block, e.g. `gates/judge.py`) to have the grader review the
 A `deliver:` block (`branch`, `push`, `pr`, `sheet_task`, `notify`) opens a
 feature branch, pushes it, and opens a PR via `gh` on a **passed** run —
 loom **never merges to `main` and never deploys**; every side-effecting
-command loom emits is restricted to `git`/`gh`/`gog`, and `deliver.merge` is
-rejected at spec load time. On a run that does not pass, `deliver` instead
+command loom emits is restricted to `git`/`gh`/`gog` (`gog` is a Google
+Workspace CLI, invoked only if the optional `deliver.sheet_task` tracker
+hook is configured), and `deliver.merge` is rejected at spec load time. On a run that does not pass, `deliver` instead
 writes a local `report.md` and takes no git action.
 
 ## Local judge (content loops)
