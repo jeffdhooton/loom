@@ -59,7 +59,34 @@ setpoint logs <name>                            # print the markdown log for a r
 setpoint fleet run examples/fleet-demo.yaml     # run several loops as a supervised fleet
 setpoint fleet status examples/fleet-demo.yaml  # fleet dashboard (table + status.md)
 setpoint fleet stop                             # request a graceful fleet stop
+setpoint migrate <repo> [--dry-run]             # convert a repo's .loom/ specs to .setpoint/
 ```
+
+## Migrating from loom
+
+This tool was previously named **loom**. The rename is the only breaking
+change: the command is now `setpoint`, spec files are `*.setpoint.yaml`, spec
+directories are `<repo>/.setpoint/`, and run state lives in `~/.setpoint/runs/`.
+
+`*.loom.yaml` specs still load for **one release** — they print a deprecation
+warning and will stop loading in the next minor. To convert a repo:
+
+```bash
+setpoint migrate <repo> --dry-run   # show exactly what would change
+setpoint migrate <repo>             # do it
+```
+
+`migrate` renames `<repo>/.loom/` to `<repo>/.setpoint/`, renames each
+`*.loom.yaml` spec, and rewrites references inside spec bodies — both fleet
+member refs and `.loom/` paths to non-spec files such as rubrics. Tracked
+files move with `git mv` so history is preserved; note that `git mv` **stages**
+what it moves, including unrelated uncommitted edits inside the directory.
+`migrate` never commits — review and commit yourself.
+
+If anything is ambiguous (a `.setpoint/` directory already exists, a rename
+would overwrite a file, or a spec nested in a subdirectory references files
+this migration will not rename) it **refuses and changes nothing** rather than
+half-migrating. Fix what it reports, then re-run.
 
 ## Loop specs
 

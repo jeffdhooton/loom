@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from setpoint.migrate import (MigrationBlocked, MigrationPlan, apply_migration,
+from setpoint.migrate import (MigrationBlocked, apply_migration,
                               plan_migration, render_plan, _is_tracked)
 
 
@@ -173,3 +173,149 @@ def test_apply_migration_return_value(tmp_path):
         "beta.loom.yaml -> beta.setpoint.yaml",
         ".loom/ -> .setpoint/",
     ]
+
+
+# --- .loom/ directory references -------------------------------------------
+# The directory is renamed too, so a reference to a NON-spec file inside it
+# (rubric, script, corpus) dangles unless the body rewrite covers ".loom/".
+
+
+def test_dir_ref_to_non_spec_file_is_rewritten(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "alpha.loom.yaml").write_text(
+        "name: alpha\nverify:\n  rubric: .loom/rubric-truth.md\n")
+
+    plan = plan_migration(repo)
+    assert repo / ".loom" / "alpha.loom.yaml" in plan.body_rewrites
+
+    apply_migration(plan)
+    assert (repo / ".setpoint" / "alpha.setpoint.yaml").read_text() == \
+        "name: alpha\nverify:\n  rubric: .setpoint/rubric-truth.md\n"
+
+
+def test_body_with_both_member_ref_and_dir_ref_in_either_order(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "fleet.yaml").write_text(
+        "rubric: .loom/before.md\n"          # dir ref BEFORE member refs
+        "members:\n  - alpha.loom.yaml\n  - beta.loom.yaml\n"
+        "corpus: .loom/after.txt\n")         # dir ref AFTER member refs
+
+    apply_migration(plan_migration(repo))
+    body = (repo / ".setpoint" / "fleet.yaml").read_text()
+    assert body == (
+        "rubric: .setpoint/before.md\n"
+        "members:\n  - alpha.setpoint.yaml\n  - beta.setpoint.yaml\n"
+        "corpus: .setpoint/after.txt\n")
+    assert ".loom" not in body
+
+
+def test_dash_loom_paths_are_not_false_positives(tmp_path):
+    """`program-health-loom/` contains "-loom/", not ".loom/" — leave it be."""
+    repo = _repo(tmp_path)
+    # The "-loom/" text sits in a file that IS rewritten (it carries a real
+    # legacy ref), so the replace genuinely runs over it.
+    (repo / ".loom" / "fleet.yaml").write_text(
+        "name: f\nmembers:\n  - alpha.loom.yaml\n"
+        "  repo: /Users/jeff/workspace/program-health-loom\n"
+        "  sub: /Users/jeff/workspace/program-health-loom/specs\n"
+        "  odd: /tmp/-loom/thing\n")
+
+    plan = plan_migration(repo)
+    assert repo / ".loom" / "fleet.yaml" in plan.body_rewrites  # replace runs
+    apply_migration(plan)
+
+    body = (repo / ".setpoint" / "fleet.yaml").read_text()
+    assert "  repo: /Users/jeff/workspace/program-health-loom\n" in body
+    assert "  sub: /Users/jeff/workspace/program-health-loom/specs\n" in body
+    assert "  odd: /tmp/-loom/thing\n" in body
+    assert "program-health-setpoint" not in body
+    assert "alpha.setpoint.yaml" in body  # the real ref still got rewritten
+
+
+def test_render_plan_reports_directory_ref_rewrites(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "alpha.loom.yaml").write_text(
+        "name: alpha\nrubric: .loom/r.md\ncorpus: .loom/c.txt\n")
+
+    out = render_plan(plan_migration(repo))
+    assert "alpha.loom.yaml: 2 .loom/ path ref(s) rewritten" in out
+
+
+# --- nested specs ----------------------------------------------------------
+# Body rewrites are non-recursive; anything nested must BLOCK rather than
+# half-migrate (owner ruling: refuse rather than half-migrate).
+
+
+def test_nested_yaml_with_legacy_member_ref_blocks(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "sub").mkdir()
+    (repo / ".loom" / "sub" / "fleet.yaml").write_text(
+        "name: nested\nmembers:\n  - ../alpha.loom.yaml\n")
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert any("sub/fleet.yaml" in problem for problem in plan.problems)
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+
+    # filesystem completely unchanged
+    assert not (repo / ".setpoint").exists()
+    assert (repo / ".loom" / "alpha.loom.yaml").exists()
+    assert (repo / ".loom" / "sub" / "fleet.yaml").read_text() == \
+        "name: nested\nmembers:\n  - ../alpha.loom.yaml\n"
+
+
+def test_nested_yaml_with_legacy_dir_ref_blocks(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "sub").mkdir()
+    (repo / ".loom" / "sub" / "child.yaml").write_text("rubric: .loom/r.md\n")
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert any("sub/child.yaml" in problem for problem in plan.problems)
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+    assert not (repo / ".setpoint").exists()
+
+
+def test_nested_yaml_without_legacy_refs_does_not_block(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "sub").mkdir()
+    (repo / ".loom" / "sub" / "notes.yaml").write_text("name: unrelated\n")
+
+    plan = plan_migration(repo)
+    assert not plan.is_blocked
+    apply_migration(plan)
+    assert (repo / ".setpoint" / "sub" / "notes.yaml").exists()
+
+
+# --- one-liners ------------------------------------------------------------
+
+
+def test_broken_symlink_at_destination_blocks(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".setpoint").symlink_to(tmp_path / "does-not-exist")
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert ".setpoint/ already exists" in plan.problems
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+    assert (repo / ".loom" / "alpha.loom.yaml").exists()
+
+
+def test_single_problem_is_not_pluralized(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".setpoint").mkdir()
+
+    out = render_plan(plan_migration(repo))
+    assert "1 problem:" in out
+    assert "1 problems" not in out
+
+
+def test_render_plan_warns_that_git_mv_stages(tmp_path):
+    out = render_plan(plan_migration(_repo(tmp_path)))
+    assert "stage" in out.lower()

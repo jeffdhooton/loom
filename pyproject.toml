@@ -1,6 +1,6 @@
 [project]
 name = "setpoint"
-version = "0.1.0"
+version = "0.2.0"
 description = "Closed-loop engine for AI agents: DISCOVER -> PLAN -> EXECUTE -> VERIFY -> ITERATE until a real gate passes"
 readme = "README.md"
 license = { text = "MIT" }

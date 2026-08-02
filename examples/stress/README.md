@@ -24,7 +24,7 @@ are **gitignored** — recreate them any time with `setup.sh`.
 ## Run it
 
 ```bash
-cd loom && . .venv/bin/activate
+cd setpoint && . .venv/bin/activate
 bash examples/stress/setup.sh                          # bootstrap working dirs
 
 # Stage 1 — judge self-correction (680w fluff → 220–320w quality brief).

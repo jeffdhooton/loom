@@ -20,6 +20,8 @@ def _member_name(member_path: Path) -> str:
     # ".../<name>.setpoint.yaml". Accept the legacy ".loom" suffix too, so an
     # un-migrated fleet still resolves its run keys. removesuffix, not replace:
     # a run named "deploy.loomtest" must not be mangled to "deploytest".
+    # DEPRECATED: drop the ".loom" entry in the same release that removes the
+    # ".loom.yaml" branch in spec.py:load_spec — they are one compat surface.
     stem = member_path.stem
     for suffix in (".setpoint", ".loom"):
         if stem.endswith(suffix):
