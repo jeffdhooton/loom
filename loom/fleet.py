@@ -17,8 +17,14 @@ def stop_sentinel_path() -> Path:
 
 def _member_name(member_path: Path) -> str:
     # Fallback when the spec can't be loaded: member paths look like
-    # ".../<name>.loom.yaml"; strip both suffixes.
-    return member_path.stem.replace(".loom", "")
+    # ".../<name>.setpoint.yaml". Accept the legacy ".loom" suffix too, so an
+    # un-migrated fleet still resolves its run keys. removesuffix, not replace:
+    # a run named "deploy.loomtest" must not be mangled to "deploytest".
+    stem = member_path.stem
+    for suffix in (".setpoint", ".loom"):
+        if stem.endswith(suffix):
+            return stem.removesuffix(suffix)
+    return stem
 
 
 def _run_name(member_path: Path) -> str:

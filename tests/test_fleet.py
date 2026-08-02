@@ -208,3 +208,13 @@ def test_run_fleet_member_load_spec_error_isolated(tmp_path, monkeypatch):
     assert result["m0"] == "error"
     assert result["m1"] == "passed"
     assert result["m2"] == "passed"
+
+
+def test_member_name_strips_only_the_suffix():
+    from pathlib import Path
+    from loom.fleet import _member_name
+
+    # a run legitimately named "deploy.loomtest" must survive intact
+    assert _member_name(Path("/x/.loom/deploy.loomtest.loom.yaml")) == "deploy.loomtest"
+    assert _member_name(Path("/x/.loom/plain.loom.yaml")) == "plain"
+    assert _member_name(Path("/x/.loom/nosuffix.yaml")) == "nosuffix"
