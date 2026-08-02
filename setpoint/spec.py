@@ -77,6 +77,8 @@ class LoopSpec:
 
 def load_spec(path: str) -> LoopSpec:
     p = Path(path).expanduser()
+    # Emit deprecation warning before read_text() so users still get the tip
+    # even if the file is missing or unreadable.
     if p.name.endswith(".loom.yaml"):
         print(f"warning: '{p.name}' uses the deprecated .loom.yaml extension, which "
               f"will stop loading in the next minor.\n"

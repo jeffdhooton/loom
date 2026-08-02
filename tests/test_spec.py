@@ -286,9 +286,10 @@ def test_legacy_loom_extension_still_loads_and_warns(tmp_path, capsys):
     spec = load_spec(str(p))
     assert spec.name == "dep"  # still loads
 
-    err = capsys.readouterr().err
-    assert "deprecated" in err
-    assert "setpoint migrate" in err
+    captured = capsys.readouterr()
+    assert "deprecated" in captured.err
+    assert "setpoint migrate" in captured.err
+    assert captured.out == ""
 
 
 def test_new_extension_is_silent(tmp_path, capsys):
@@ -298,4 +299,6 @@ def test_new_extension_is_silent(tmp_path, capsys):
     p.write_text(_minimal_spec_text(tmp_path))
 
     load_spec(str(p))
-    assert capsys.readouterr().err == ""
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
