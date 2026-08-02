@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from loom.budget import Usage
+from loom.retry import with_retries
 from loom.tools import Tool, ToolContext
 from .base import ExecEvent, ExecuteResult, Executor
 
@@ -31,7 +32,12 @@ class DeepSeekExecutor(Executor):
             kwargs = {"model": model, "messages": messages}
             if schemas:
                 kwargs["tools"] = schemas  # NOTE: never set tool_choice (unsupported)
-            resp = self.client.chat.completions.create(**kwargs)
+            resp = with_retries(
+                lambda: self.client.chat.completions.create(**kwargs),
+                on_retry=lambda n, delay, e: on_event(ExecEvent("note", {
+                    "text": f"transient API error ({type(e).__name__}), "
+                            f"retry {n} in {delay:g}s"})),
+            )
 
             u = resp.usage
             cache = getattr(u, "prompt_cache_hit_tokens", 0) or 0
@@ -83,4 +89,5 @@ class DeepSeekExecutor(Executor):
                 })
 
         return ExecuteResult(
-            text="[executor stopped: hit max tool turns]", usage=usage, steps=steps)
+            text=f"[executor stopped: hit max tool turns ({self.max_turns})]",
+            usage=usage, steps=steps, stop_reason="max_turns")

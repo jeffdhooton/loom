@@ -49,7 +49,7 @@ class AgentCLIExecutor(Executor):
         except subprocess.TimeoutExpired:
             on_event(ExecEvent("note", {"text": f"agent timeout after {timeout}s"}))
             return ExecuteResult(text=f"[agent timeout after {timeout}s]",
-                                 usage=Usage(), steps=[])
+                                 usage=Usage(), steps=[], stop_reason="timeout")
         except FileNotFoundError as e:
             on_event(ExecEvent("note", {"text": f"agent binary not found: {argv[0]} ({e})"}))
             return ExecuteResult(text=f"[agent binary not found: {argv[0]}]",

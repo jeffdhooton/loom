@@ -58,3 +58,64 @@ def test_schema_shape():
     assert t.schema["type"] == "function"
     assert t.schema["function"]["name"] == "read"
     assert "parameters" in t.schema["function"]
+
+
+def test_bash_timeout_returns_feedback_instead_of_raising(tmp_path):
+    # A hung command must come back as a string the loop can plan against —
+    # an escaping TimeoutExpired would kill the whole run.
+    out = reg_map(["bash"])["bash"].run(
+        {"cmd": "sleep 5", "timeout": 1}, ToolContext(cwd=tmp_path))
+    assert "timed out" in out.lower()
+    assert "1s" in out
+
+
+def test_bash_timeout_is_exposed_in_schema():
+    # args.get("timeout") is dead unless the model can actually pass it
+    props = reg_map(["bash"])["bash"].schema["function"]["parameters"]["properties"]
+    assert "timeout" in props
+    assert props["timeout"]["type"] == "number"
+
+
+def test_bash_timeout_is_clamped(tmp_path):
+    from loom.tools.local import _BASH_TIMEOUT, _BASH_TIMEOUT_MAX, _bash_timeout
+
+    assert _bash_timeout({"timeout": 99999}) == _BASH_TIMEOUT_MAX
+    assert _bash_timeout({"timeout": 0}) == _BASH_TIMEOUT      # falsy -> default
+    assert _bash_timeout({"timeout": "junk"}) == _BASH_TIMEOUT
+    assert _bash_timeout({}) == _BASH_TIMEOUT
+
+
+def test_bash_missing_cmd_returns_error_not_raise(tmp_path):
+    out = reg_map(["bash"])["bash"].run({}, ToolContext(cwd=tmp_path))
+    assert "error" in out.lower()
+
+
+def test_bash_output_is_clipped(tmp_path):
+    from loom.tools.local import _OUT_MAX
+
+    out = reg_map(["bash"])["bash"].run(
+        {"cmd": "printf 'x%.0s' $(seq 1 50000)"}, ToolContext(cwd=tmp_path))
+    assert len(out) < _OUT_MAX + 200  # budget plus the elision marker
+    assert "truncated" in out
+
+
+def test_bash_clip_keeps_the_tail_where_failures_print(tmp_path):
+    out = reg_map(["bash"])["bash"].run(
+        {"cmd": "printf 'x%.0s' $(seq 1 50000); echo FAILED_HERE"},
+        ToolContext(cwd=tmp_path))
+    assert "FAILED_HERE" in out
+
+
+def test_read_clips_large_files(tmp_path):
+    from loom.tools.local import _READ_MAX
+
+    (tmp_path / "big.txt").write_text("y" * 100_000)
+    out = reg_map(["read"])["read"].run({"path": "big.txt"}, ToolContext(cwd=tmp_path))
+    assert len(out) < _READ_MAX + 200
+    assert "truncated" in out
+
+
+def test_read_leaves_small_files_untouched(tmp_path):
+    (tmp_path / "s.txt").write_text("hello")
+    assert reg_map(["read"])["read"].run(
+        {"path": "s.txt"}, ToolContext(cwd=tmp_path)) == "hello"

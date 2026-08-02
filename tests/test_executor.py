@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from loom.executor.base import ExecEvent
 from loom.executor.deepseek import DeepSeekExecutor
 from loom.tools import build_registry
@@ -95,3 +97,70 @@ def test_executor_caps_tool_turns(tmp_path):
                         tmp_path, lambda e: None)
     assert "stopped" in result.text.lower() or "max" in result.text.lower()
     assert len(client.calls) == 5
+    # the cap is its own signal, not just prose in the summary
+    assert result.stop_reason == "max_turns"
+
+
+def test_executor_reports_done_when_agent_finishes(tmp_path):
+    client = FakeClient([_resp(_msg(content="finished"))])
+    ex = DeepSeekExecutor(client=client, pricing=PRICING)
+    result = ex.execute("s", "t", build_registry(["read"]), "deepseek-v4-flash",
+                        tmp_path, lambda e: None)
+    assert result.stop_reason == "done"
+
+
+class FlakyClient(FakeClient):
+    """Raises a transient error `fail_times` times before serving responses."""
+    def __init__(self, responses, fail_times):
+        super().__init__(responses)
+        self.remaining_failures = fail_times
+        self.attempts = 0
+
+    def _create(self, **kw):
+        self.attempts += 1
+        if self.remaining_failures > 0:
+            self.remaining_failures -= 1
+            raise RateLimitError(429)
+        return super()._create(**kw)
+
+
+class RateLimitError(Exception):
+    def __init__(self, status_code):
+        super().__init__(f"status {status_code}")
+        self.status_code = status_code
+
+
+def test_executor_retries_transient_api_errors(tmp_path, monkeypatch):
+    from loom import retry
+    monkeypatch.setattr(retry, "_sleep", lambda s: None)
+
+    client = FlakyClient([_resp(_msg(content="recovered"))], fail_times=2)
+    ex = DeepSeekExecutor(client=client, pricing=PRICING)
+    events = []
+    result = ex.execute("s", "t", build_registry(["read"]), "deepseek-v4-flash",
+                        tmp_path, events.append)
+
+    assert result.text == "recovered"
+    assert client.attempts == 3  # two 429s absorbed, third call served
+    assert any(e.kind == "note" and "retry" in e.data["text"] for e in events)
+
+
+def test_executor_does_not_retry_permanent_api_errors(tmp_path, monkeypatch):
+    from loom import retry
+    monkeypatch.setattr(retry, "_sleep", lambda s: None)
+
+    class BadKey(FakeClient):
+        def __init__(self):
+            super().__init__([])
+            self.attempts = 0
+
+        def _create(self, **kw):
+            self.attempts += 1
+            raise RateLimitError(401)
+
+    client = BadKey()
+    ex = DeepSeekExecutor(client=client, pricing=PRICING)
+    with pytest.raises(RateLimitError):
+        ex.execute("s", "t", build_registry(["read"]), "deepseek-v4-flash",
+                   tmp_path, lambda e: None)
+    assert client.attempts == 1
