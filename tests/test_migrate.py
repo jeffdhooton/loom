@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from setpoint.migrate import (MigrationPlan, apply_migration, plan_migration,
-                              render_plan, _is_tracked)
+from setpoint.migrate import (MigrationBlocked, MigrationPlan, apply_migration,
+                              plan_migration, render_plan, _is_tracked)
 
 
 def _repo(tmp_path, *, git=True, track=True) -> Path:
@@ -92,3 +92,84 @@ def test_untracked_files_in_a_git_repo_use_plain_move(tmp_path):
     assert not _is_tracked(repo, repo / ".loom" / "alpha.loom.yaml")
     apply_migration(plan_migration(repo))
     assert (repo / ".setpoint" / "alpha.setpoint.yaml").exists()
+
+
+def test_setpoint_dir_already_exists_blocks_and_leaves_disk_unchanged(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".setpoint").mkdir()
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert ".setpoint/ already exists" in plan.problems
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+
+    # nothing on disk changed
+    assert (repo / ".loom" / "alpha.loom.yaml").read_text() == "name: alpha\n"
+    assert (repo / ".loom" / "beta.loom.yaml").exists()
+    assert (repo / ".loom" / "fleet.yaml").read_text() == (
+        "name: f\nmembers:\n  - alpha.loom.yaml\n  - beta.loom.yaml\n")
+
+
+def test_colliding_destination_blocks_and_preserves_destination_content(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "alpha.setpoint.yaml").write_text("name: pre-existing\n")
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert "alpha.setpoint.yaml would be overwritten" in plan.problems
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+
+    # the destination's original content must survive untouched
+    assert (repo / ".loom" / "alpha.setpoint.yaml").read_text() == "name: pre-existing\n"
+    assert (repo / ".loom" / "alpha.loom.yaml").exists()
+
+
+def test_fleet_reference_outside_rename_scope_blocks(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".loom" / "sub").mkdir()
+    (repo / ".loom" / "sub" / "x.loom.yaml").write_text("name: x\n")
+    (repo / ".loom" / "fleet.yaml").write_text(
+        "name: f\nmembers:\n  - alpha.loom.yaml\n  - sub/x.loom.yaml\n")
+
+    plan = plan_migration(repo)
+    assert plan.is_blocked
+    assert any(
+        "sub/x.loom.yaml" in problem and "will not rename" in problem
+        for problem in plan.problems
+    )
+
+    with pytest.raises(MigrationBlocked):
+        apply_migration(plan)
+    assert (repo / ".loom" / "sub" / "x.loom.yaml").exists()
+    assert "sub/x.loom.yaml" in (repo / ".loom" / "fleet.yaml").read_text()
+
+
+def test_render_plan_shows_problems_when_blocked(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / ".setpoint").mkdir()
+
+    out = render_plan(plan_migration(repo))
+    assert "REFUSING" in out
+    assert ".setpoint/ already exists" in out
+    assert "nothing was changed" in out
+
+
+def test_clean_repo_is_not_blocked(tmp_path):
+    plan = plan_migration(_repo(tmp_path))
+    assert not plan.is_blocked
+    assert plan.problems == []
+
+
+def test_apply_migration_return_value(tmp_path):
+    repo = _repo(tmp_path)
+    actions = apply_migration(plan_migration(repo))
+    assert actions == [
+        "rewrote member refs in fleet.yaml",
+        "alpha.loom.yaml -> alpha.setpoint.yaml",
+        "beta.loom.yaml -> beta.setpoint.yaml",
+        ".loom/ -> .setpoint/",
+    ]
