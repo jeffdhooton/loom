@@ -117,3 +117,54 @@ def test_fleet_run_dispatches(monkeypatch, tmp_path):
     monkeypatch.setattr(fleet, "fleet_status", lambda p: "STATUS")
     rc = m.main(["fleet", "run", "f.yaml"])
     assert rc == 0 and called["run"] == "f.yaml"
+
+
+def _loom_repo(tmp_path) -> Path:
+    repo = tmp_path / "dep"
+    (repo / ".loom").mkdir(parents=True)
+    (repo / ".loom" / "one.loom.yaml").write_text("name: one\n")
+    (repo / ".loom" / "fleet.yaml").write_text("name: f\nmembers:\n  - one.loom.yaml\n")
+    return repo
+
+
+def test_migrate_dry_run_changes_nothing(tmp_path, capsys):
+    repo = _loom_repo(tmp_path)
+    assert cli.main(["migrate", str(repo), "--dry-run"]) == 0
+    assert (repo / ".loom" / "one.loom.yaml").exists()
+    assert not (repo / ".setpoint").exists()
+    assert ".setpoint" in capsys.readouterr().out
+
+
+def test_migrate_applies(tmp_path):
+    repo = _loom_repo(tmp_path)
+    assert cli.main(["migrate", str(repo)]) == 0
+    assert (repo / ".setpoint" / "one.setpoint.yaml").exists()
+    assert "one.setpoint.yaml" in (repo / ".setpoint" / "fleet.yaml").read_text()
+
+
+def test_migrate_missing_repo_errors(tmp_path):
+    assert cli.main(["migrate", str(tmp_path / "nope")]) == 1
+
+
+def test_migrate_requires_a_path(capsys):
+    assert cli.main(["migrate"]) == 1
+
+
+def test_migrate_on_clean_repo_is_a_noop(tmp_path, capsys):
+    repo = tmp_path / "clean"
+    repo.mkdir()
+    assert cli.main(["migrate", str(repo)]) == 0
+    assert "nothing to migrate" in capsys.readouterr().out
+
+
+def test_migrate_blocked_when_setpoint_dir_already_exists(tmp_path, capsys):
+    repo = _loom_repo(tmp_path)
+    (repo / ".setpoint").mkdir()
+    assert cli.main(["migrate", str(repo)]) == 1
+    out = capsys.readouterr().out
+    assert "REFUSING" in out
+    assert ".setpoint/ already exists" in out
+    # filesystem must be untouched: nothing renamed, no apply happened
+    assert (repo / ".loom" / "one.loom.yaml").exists()
+    assert (repo / ".loom" / "fleet.yaml").read_text() == "name: f\nmembers:\n  - one.loom.yaml\n"
+    assert list((repo / ".setpoint").iterdir()) == []

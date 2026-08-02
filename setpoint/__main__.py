@@ -116,6 +116,24 @@ def cmd_logs(name: str) -> int:
     return 0
 
 
+def cmd_migrate(repo: str, dry_run: bool = False) -> int:
+    from setpoint.migrate import apply_migration, plan_migration, render_plan
+
+    root = Path(repo).expanduser()
+    if not root.is_dir():
+        print(f"migrate: no such directory: {root}", file=sys.stderr)
+        return 1
+
+    plan = plan_migration(root)
+    print(render_plan(plan))
+    if plan.is_blocked:
+        return 1
+    if dry_run or plan.is_empty:
+        return 0
+    apply_migration(plan)
+    return 0
+
+
 def cmd_fleet(rest: list[str]) -> int:
     from setpoint import fleet
     if not rest:
@@ -169,6 +187,11 @@ def main(argv: list[str] | None = None) -> int:
             print("logs: missing run name", file=sys.stderr)
             return 1
         return cmd_logs(rest[0])
+    if cmd == "migrate":
+        if not rest:
+            print("migrate: missing repo path", file=sys.stderr)
+            return 1
+        return cmd_migrate(rest[0], dry_run=("--dry-run" in rest))
     if cmd == "fleet":
         return cmd_fleet(rest)
     print(f"unknown command: {cmd}", file=sys.stderr)
