@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: examples/stress-sandbox
   worktree: true
-  branch: loom/stress-multibug
+  branch: setpoint/stress-multibug
 context:
   notes: |
     mathlib.py contains several independent bugs across add, is_even, factorial,

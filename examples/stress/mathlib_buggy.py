@@ -1,8 +1,8 @@
-"""A tiny math utility library — PRISTINE BUGGY SEED for the loom stress sweep.
+"""A tiny math utility library — PRISTINE BUGGY SEED for the setpoint stress sweep.
 
 This file is copied to `mathlib.py` inside the (gitignored) stress sandboxes by
 `setup.sh`. It contains 6 independent, deliberately-planted bugs spread across the
-functions so that `pytest -q` surfaces several failures at once. The loom coding
+functions so that `pytest -q` surfaces several failures at once. The setpoint coding
 loop must read the pytest output, fix the bugs, and re-verify across iterations.
 
 Do NOT "pre-fix" this file — its broken state is the whole point.

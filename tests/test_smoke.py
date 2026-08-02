@@ -1,5 +1,5 @@
-from loom import __version__
-from loom.__main__ import main
+from setpoint import __version__
+from setpoint.__main__ import main
 
 
 def test_version():

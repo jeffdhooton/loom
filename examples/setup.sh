@@ -25,5 +25,5 @@ PY
 
 git -C "$DIR" init -q -b main
 git -C "$DIR" add -A
-git -C "$DIR" -c user.email=loom@local -c user.name=loom commit -q -m "sandbox with failing test"
-echo "✓ $DIR ready — try: loom run examples/coding.loom.yaml"
+git -C "$DIR" -c user.email=setpoint@local -c user.name=setpoint commit -q -m "sandbox with failing test"
+echo "✓ $DIR ready — try: setpoint run examples/coding.setpoint.yaml"

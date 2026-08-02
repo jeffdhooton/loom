@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from loom.budget import Usage
-from loom.tools import Tool
+from setpoint.budget import Usage
+from setpoint.tools import Tool
 
 
 @dataclass

@@ -22,5 +22,5 @@ chmod +x "$STUB_DIR/claude"
 git -C examples/sandbox checkout main -- calc.py
 git -C examples/sandbox worktree prune
 
-PATH="$STUB_DIR:$PATH" loom fleet run examples/fleet-demo.yaml --fresh
-loom fleet status examples/fleet-demo.yaml
+PATH="$STUB_DIR:$PATH" setpoint fleet run examples/fleet-demo.yaml --fresh
+setpoint fleet status examples/fleet-demo.yaml

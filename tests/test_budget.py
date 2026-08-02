@@ -1,4 +1,4 @@
-from loom.budget import Budget, Usage, PRICING
+from setpoint.budget import Budget, Usage, PRICING
 
 
 def test_pricing_has_models():
@@ -44,7 +44,7 @@ def test_no_caps_never_stops():
 
 
 def test_wall_clock_stop(monkeypatch):
-    import loom.budget as b
+    import setpoint.budget as b
     clock = {"t": 1000.0}
     monkeypatch.setattr(b.time, "monotonic", lambda: clock["t"])
     budget = b.Budget(max_usd=None, max_tokens=None, pricing=b.PRICING, wall_clock_secs=60)
@@ -54,7 +54,7 @@ def test_wall_clock_stop(monkeypatch):
 
 
 def test_agent_engines_priced_zero():
-    import loom.budget as b
+    import setpoint.budget as b
     u = b.Usage(input_tokens=1000, output_tokens=1000)
     assert u.cost("claude", b.PRICING) == 0.0
     assert u.cost("codex", b.PRICING) == 0.0

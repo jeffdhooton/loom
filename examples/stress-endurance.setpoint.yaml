@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: examples/stress-endurance-sandbox
   worktree: true
-  branch: loom/stress-endurance
+  branch: setpoint/stress-endurance
 context:
   notes: |
     mathlib.py has the same independent bugs as the coding sandbox. Run `pytest -q`,

@@ -1,8 +1,8 @@
 import subprocess
 from pathlib import Path
 
-from loom.workspace import Worktree, prepare_workspace
-from loom.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
+from setpoint.workspace import Worktree, prepare_workspace
+from setpoint.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
 
 
 def _git(repo, *args):
@@ -23,7 +23,7 @@ def _make_repo(tmp_path) -> Path:
 
 def test_worktree_create_and_cleanup(tmp_path):
     repo = _make_repo(tmp_path)
-    wt = Worktree(repo=repo, branch="loom/test")
+    wt = Worktree(repo=repo, branch="setpoint/test")
     path = wt.create()
     assert path.exists()
     assert (path / "f.txt").read_text() == "hi"

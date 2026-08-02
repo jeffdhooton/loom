@@ -1,4 +1,4 @@
-from loom.clip import DEFAULT_MAX, clip
+from setpoint.clip import DEFAULT_MAX, clip
 
 
 def test_short_text_is_untouched():

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap the (gitignored) working dirs for the loom stress sweep from the
+# Bootstrap the (gitignored) working dirs for the setpoint stress sweep from the
 # pristine seeds in this directory. Idempotent: re-running wipes and recreates them.
 #
 #   bash examples/stress/setup.sh
@@ -20,11 +20,11 @@ init_sandbox() {
   done
   git -C "$dir" init -q
   git -C "$dir" add -A
-  git -C "$dir" -c user.email=loom@local -c user.name=loom commit -q -m "stress sandbox: buggy mathlib + tests"
+  git -C "$dir" -c user.email=setpoint@local -c user.name=setpoint commit -q -m "stress sandbox: buggy mathlib + tests"
   echo "  ✓ $dir ($(git -C "$dir" rev-parse --short HEAD))"
 }
 
-echo "Bootstrapping loom stress fixtures…"
+echo "Bootstrapping setpoint stress fixtures…"
 
 # Stage 1 — content: seed the bloated draft into the (worktree-free) out dir.
 rm -rf "$EXAMPLES_DIR/stress-out"
@@ -50,7 +50,7 @@ rm -rf "$feat_dir"; mkdir -p "$feat_dir"
 cp "$SEED_DIR/romans_stub.py" "$feat_dir/romans.py"
 git -C "$feat_dir" init -q
 git -C "$feat_dir" add -A
-git -C "$feat_dir" -c user.email=loom@local -c user.name=loom commit -q -m "stress feature sandbox: romans stub"
+git -C "$feat_dir" -c user.email=setpoint@local -c user.name=setpoint commit -q -m "stress feature sandbox: romans stub"
 echo "  ✓ $feat_dir ($(git -C "$feat_dir" rev-parse --short HEAD)) — hidden oracle NOT copied in"
 
 echo "Done. Now run the sweep (see examples/stress/README.md)."

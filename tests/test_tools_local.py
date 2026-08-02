@@ -1,5 +1,5 @@
 import pytest
-from loom.tools import build_registry, ToolContext
+from setpoint.tools import build_registry, ToolContext
 
 
 def reg_map(names):
@@ -77,7 +77,7 @@ def test_bash_timeout_is_exposed_in_schema():
 
 
 def test_bash_timeout_is_clamped(tmp_path):
-    from loom.tools.local import _BASH_TIMEOUT, _BASH_TIMEOUT_MAX, _bash_timeout
+    from setpoint.tools.local import _BASH_TIMEOUT, _BASH_TIMEOUT_MAX, _bash_timeout
 
     assert _bash_timeout({"timeout": 99999}) == _BASH_TIMEOUT_MAX
     assert _bash_timeout({"timeout": 0}) == _BASH_TIMEOUT      # falsy -> default
@@ -91,7 +91,7 @@ def test_bash_missing_cmd_returns_error_not_raise(tmp_path):
 
 
 def test_bash_output_is_clipped(tmp_path):
-    from loom.tools.local import _OUT_MAX
+    from setpoint.tools.local import _OUT_MAX
 
     out = reg_map(["bash"])["bash"].run(
         {"cmd": "printf 'x%.0s' $(seq 1 50000)"}, ToolContext(cwd=tmp_path))
@@ -107,7 +107,7 @@ def test_bash_clip_keeps_the_tail_where_failures_print(tmp_path):
 
 
 def test_read_clips_large_files(tmp_path):
-    from loom.tools.local import _READ_MAX
+    from setpoint.tools.local import _READ_MAX
 
     (tmp_path / "big.txt").write_text("y" * 100_000)
     out = reg_map(["read"])["read"].run({"path": "big.txt"}, ToolContext(cwd=tmp_path))

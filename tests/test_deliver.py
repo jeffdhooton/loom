@@ -26,7 +26,7 @@ def _spec(deliver):
 
 
 def test_deliver_passed_opens_pr_and_updates_sheet(tmp_path):
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     calls = []
 
     def fake_run(argv, **kwargs):
@@ -49,7 +49,7 @@ def test_deliver_passed_opens_pr_and_updates_sheet(tmp_path):
 
 
 def test_deliver_stopped_writes_report_only(tmp_path):
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     calls = []
     res = deliver(_spec({"push": True, "pr": True}), tmp_path, _stopped_state(),
                   runner=lambda a, **k: calls.append(a) or _FakeCompleted(0, ""))
@@ -61,7 +61,7 @@ def test_deliver_stopped_writes_report_only(tmp_path):
 
 def test_deliver_merge_flag_is_refused(tmp_path):
     import pytest
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     with pytest.raises(ValueError, match="merge"):
         deliver(_spec({"merge": True}), tmp_path, _passed_state(),
                 runner=lambda a, **k: _FakeCompleted(0, ""))
@@ -72,7 +72,7 @@ def test_deliver_goal_containing_deploy_word_still_delivers(tmp_path):
     # includes the commit message and PR title/body derived from spec.goal.
     # A goal containing the word "deploy" (not a deploy command) must not
     # trip the guard and abort delivery.
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     calls = []
 
     def fake_run(argv, **kwargs):
@@ -90,14 +90,14 @@ def test_deliver_goal_containing_deploy_word_still_delivers(tmp_path):
 
 def test_deliver_branch_main_is_refused(tmp_path):
     import pytest
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     with pytest.raises(ValueError, match="(?i)branch|main"):
         deliver(_spec({"branch": "main"}), tmp_path, _passed_state(),
                 runner=lambda a, **k: _FakeCompleted(0, ""))
 
 
 def test_deliver_stopped_writes_report_to_durable_report_dir(tmp_path):
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     cwd = tmp_path / "worktree"
     cwd.mkdir()
     report_dir = tmp_path / "durable"
@@ -115,7 +115,7 @@ def test_deliver_stopped_writes_report_to_durable_report_dir(tmp_path):
 
 
 def test_deliver_pr_defaults_base_to_main(tmp_path):
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     calls = []
 
     def fake_run(argv, **kwargs):
@@ -130,7 +130,7 @@ def test_deliver_pr_defaults_base_to_main(tmp_path):
 
 
 def test_deliver_pr_targets_configured_base(tmp_path):
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     calls = []
 
     def fake_run(argv, **kwargs):
@@ -147,7 +147,7 @@ def test_deliver_pr_targets_configured_base(tmp_path):
 
 def test_deliver_base_equal_to_branch_is_refused(tmp_path):
     import pytest
-    from loom.deliver import deliver
+    from setpoint.deliver import deliver
     with pytest.raises(ValueError, match="(?i)base"):
         deliver(_spec({"branch": "develop", "base": "develop"}), tmp_path, _passed_state(),
                 runner=lambda a, **k: _FakeCompleted(0, ""))
@@ -155,7 +155,7 @@ def test_deliver_base_equal_to_branch_is_refused(tmp_path):
 
 def test_guards_refuse_real_deploy_and_merge_commands():
     import pytest
-    from loom.deliver import _check_allowed_verb, _check_no_merge
+    from setpoint.deliver import _check_allowed_verb, _check_no_merge
 
     with pytest.raises(ValueError):
         _check_allowed_verb(["fly", "deploy", "-c", "x"])

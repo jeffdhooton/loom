@@ -1,5 +1,5 @@
-from loom.tools import build_registry, ToolContext
-import loom.tools.external as ext
+from setpoint.tools import build_registry, ToolContext
+import setpoint.tools.external as ext
 
 
 def reg_map(names):

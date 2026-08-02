@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from loom.clip import clip
+from setpoint.clip import clip
 from . import Gate, GateResult
 
 

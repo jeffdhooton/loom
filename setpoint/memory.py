@@ -30,7 +30,7 @@ class RunState:
 class Memory:
     def __init__(self, name: str, root: Path | None = None):
         self.name = name
-        self.root = (root or (Path.home() / ".loom" / "runs")) / name
+        self.root = (root or (Path.home() / ".setpoint" / "runs")) / name
         self.state_path = self.root / "state.json"
         self.log_path = self.root / "log.md"
 

@@ -4,7 +4,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# loom never deploys and never merges — deploys are manual (see repo
+# setpoint never deploys and never merges — deploys are manual (see repo
 # CLAUDE.md), merges are human-reviewed. deliver() only ever legitimately
 # emits git/gh/gog commands, so the guard is a structural allow-list on the
 # command verb (argv[0]), not a substring scan of free-text arguments (PR
@@ -41,7 +41,7 @@ def _run(runner, argv: list[str], cwd: Path):
 
 
 def _write_report(spec, cwd: Path, state, report_dir: Path | None = None) -> str:
-    lines = [f"# loom report — {spec.name}", "", f"**Goal:** {spec.goal}",
+    lines = [f"# setpoint report — {spec.name}", "", f"**Goal:** {spec.goal}",
              f"**Status:** {state.status}", "", "## Iterations"]
     for it in state.iters:
         mark = "PASS" if getattr(it, "passed", False) else "FAIL"
@@ -62,25 +62,25 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
     """
     d = spec.deliver or {}
     if d.get("merge"):
-        # Defense in depth: loom.spec.load_spec already refuses `deliver.merge`
+        # Defense in depth: setpoint.spec.load_spec already refuses `deliver.merge`
         # at load time, but deliver() must independently refuse it too, since
         # it can be called directly (e.g. from tests or future call sites)
         # without going through load_spec.
-        raise ValueError("deliver.merge must be false — loom never merges to main")
+        raise ValueError("deliver.merge must be false — setpoint never merges to main")
 
     branch = d.get("branch") or f"loop/{spec.name}"
     if branch.lower() in {"main", "master"}:
-        # Defense in depth: loom.spec.load_spec already refuses a main/master
+        # Defense in depth: setpoint.spec.load_spec already refuses a main/master
         # deliver.branch at load time, but deliver() must independently
         # refuse it too, since it can be called directly without going
         # through load_spec.
-        raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
+        raise ValueError("deliver.branch must not be main/master — setpoint never touches the trunk")
 
     base = d.get("base") or "main"
     if base.lower() == branch.lower():
         # A PR whose base equals its head is degenerate; gh would reject it,
         # but fail fast with a clear message. (base may legitimately be a
-        # non-trunk integration branch like `develop` — loom PRs *into* the
+        # non-trunk integration branch like `develop` — setpoint PRs *into* the
         # base, it never pushes to it directly, so base is otherwise free.)
         raise ValueError(f"deliver.base must differ from deliver.branch (both {base!r})")
 
@@ -91,7 +91,7 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
 
     _run(runner, ["git", "checkout", "-B", branch], cwd)
     _run(runner, ["git", "add", "-A"], cwd)
-    _run(runner, ["git", "commit", "-m", f"loom: {spec.name} — {spec.goal[:60]}"], cwd)
+    _run(runner, ["git", "commit", "-m", f"setpoint: {spec.name} — {spec.goal[:60]}"], cwd)
     actions.append(f"branch {branch}")
 
     pr_url = None
@@ -99,7 +99,7 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
         _run(runner, ["git", "push", "-u", "origin", branch], cwd)
         actions.append("push")
     if d.get("pr", True):
-        body = (f"Autonomous loom run for {spec.name}.\n\n"
+        body = (f"Autonomous setpoint run for {spec.name}.\n\n"
                  f"Goal: {spec.goal}\n\nVerifier + grader passed. Review before merge.")
         proc = _run(runner, ["gh", "pr", "create", "--base", base,
                              "--head", branch, "--title", f"{spec.name}: {spec.goal[:60]}",
@@ -111,7 +111,7 @@ def deliver(spec, cwd: Path, state, runner=subprocess.run, report_dir: Path | No
         # skill's wrapper around `gog sheets`). The concrete subcommand can be
         # aligned to the status skill's exact invocation without breaking the
         # deliver contract, as long as the task id appears in the command.
-        note = f"loom: PR opened for {d['sheet_task']}" + (f" {pr_url}" if pr_url else "")
+        note = f"setpoint: PR opened for {d['sheet_task']}" + (f" {pr_url}" if pr_url else "")
         _run(runner, ["gog", "sheets", "note", d["sheet_task"], note], cwd)
         actions.append(f"sheet {d['sheet_task']}")
     if d.get("notify"):

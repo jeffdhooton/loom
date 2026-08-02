@@ -1,12 +1,12 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from loom.cycle import Cycle
-from loom.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
-from loom.budget import Budget, Usage, PRICING
-from loom.memory import Memory
-from loom.gates import GateResult
-from loom.executor.base import ExecuteResult
+from setpoint.cycle import Cycle
+from setpoint.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
+from setpoint.budget import Budget, Usage, PRICING
+from setpoint.memory import Memory
+from setpoint.gates import GateResult
+from setpoint.executor.base import ExecuteResult
 
 
 class StubUI:
@@ -113,19 +113,19 @@ def test_cycle_no_progress_bailout(tmp_path):
 def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
     # A cycle whose abort_check() is True stops immediately with status "stopped".
     from types import SimpleNamespace
-    from loom.cycle import Cycle
-    from loom.memory import Memory
-    from loom.budget import Budget, PRICING
+    from setpoint.cycle import Cycle
+    from setpoint.memory import Memory
+    from setpoint.budget import Budget, PRICING
 
     class _Gate:
         def verify(self, cwd, on_event):  # never reached
-            from loom.gates import GateResult
+            from setpoint.gates import GateResult
             return GateResult(passed=True, feedback="", score=1.0)
 
     class _Exec:
         def execute(self, **kw):
-            from loom.budget import Usage
-            from loom.executor.base import ExecuteResult
+            from setpoint.budget import Usage
+            from setpoint.executor.base import ExecuteResult
             return ExecuteResult(text="", usage=Usage(), steps=[])
 
     class _UI:
@@ -143,7 +143,7 @@ def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
         stop=SimpleNamespace(max_iters=5, no_progress_after=None),
         workspace=SimpleNamespace(repo=tmp_path),
     )
-    from loom.executor.agent_plan import AgentPlanClient
+    from setpoint.executor.agent_plan import AgentPlanClient
     mem = Memory("ab", root=tmp_path / "runs")
     budget = Budget(None, None, PRICING)
     cyc = Cycle(spec, _Exec(), _Gate(), mem, budget, _UI(), AgentPlanClient(),
@@ -272,7 +272,7 @@ def test_clean_executor_adds_no_cutoff_note(tmp_path):
 
 
 def test_cycle_retries_transient_plan_errors(tmp_path, monkeypatch):
-    from loom import retry
+    from setpoint import retry
     monkeypatch.setattr(retry, "_sleep", lambda s: None)
 
     class Transient(Exception):

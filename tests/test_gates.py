@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from loom.gates import GateResult
-from loom.gates.command import CommandGate
-from loom.gates.judge import JudgeGate
+from setpoint.gates import GateResult
+from setpoint.gates.command import CommandGate
+from setpoint.gates.judge import JudgeGate
 
 
 def test_command_gate_pass(tmp_path):
@@ -57,8 +57,8 @@ def test_judge_gate_fail_below_threshold(tmp_path):
 
 
 def test_build_gate_local_judge_disables_thinking(tmp_path):
-    from loom.spec import load_spec
-    from loom.gates import build_gate
+    from setpoint.spec import load_spec
+    from setpoint.gates import build_gate
     rubric = tmp_path / "r.md"
     rubric.write_text("be good")
     spec_file = tmp_path / "c.yaml"
@@ -74,8 +74,8 @@ def test_build_gate_local_judge_disables_thinking(tmp_path):
 
 
 def test_build_gate_deepseek_judge_no_extra_body(tmp_path):
-    from loom.spec import load_spec
-    from loom.gates import build_gate
+    from setpoint.spec import load_spec
+    from setpoint.gates import build_gate
     rubric = tmp_path / "r.md"
     rubric.write_text("be good")
     spec_file = tmp_path / "c.yaml"
@@ -102,7 +102,7 @@ def test_judge_gate_fails_fast_on_deterministic_check(tmp_path):
                 def create(**kw):
                     raise AssertionError("LLM should not be called when checks fail")
 
-    from loom.gates.judge import JudgeGate
+    from setpoint.gates.judge import JudgeGate
     g = JudgeGate(client=ExplodingClient(), model="qwen3.6:27b", rubric_text="r",
                   threshold=0.8, artifact=str(artifact), checks=[{"max_words": 400}])
     r = g.verify(cwd=tmp_path, on_event=lambda e: None)
@@ -112,7 +112,7 @@ def test_judge_gate_fails_fast_on_deterministic_check(tmp_path):
 
 def test_judge_gate_structured_criteria_can_fail_high_score(tmp_path):
     from types import SimpleNamespace
-    from loom.gates.judge import JudgeGate
+    from setpoint.gates.judge import JudgeGate
     artifact = tmp_path / "a.md"
     artifact.write_text("short enough")
 

@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Callable
 
-from loom.budget import Usage
-from loom.retry import with_retries
-from loom.tools import Tool, ToolContext
+from setpoint.budget import Usage
+from setpoint.retry import with_retries
+from setpoint.tools import Tool, ToolContext
 from .base import ExecEvent, ExecuteResult, Executor
 
 

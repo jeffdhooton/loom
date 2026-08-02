@@ -12,7 +12,7 @@ def _make_fleet(tmp_path, n=4, concurrency=2):
     names = []
     members = []
     for i in range(n):
-        sp = tmp_path / f"m{i}.loom.yaml"
+        sp = tmp_path / f"m{i}.setpoint.yaml"
         sp.write_text(f"name: m{i}\n")
         names.append(f"m{i}")
         members.append(sp.name)
@@ -23,10 +23,10 @@ def _make_fleet(tmp_path, n=4, concurrency=2):
 
 
 def test_run_fleet_runs_all_members(tmp_path, monkeypatch):
-    from loom import fleet
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
-    monkeypatch.setattr("loom.spec.load_spec",
-                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+    monkeypatch.setattr("setpoint.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".setpoint", "")))
 
     def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
         return SimpleNamespace(status="passed")
@@ -38,10 +38,10 @@ def test_run_fleet_runs_all_members(tmp_path, monkeypatch):
 
 
 def test_run_fleet_honors_concurrency(tmp_path, monkeypatch):
-    from loom import fleet
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
-    monkeypatch.setattr("loom.spec.load_spec",
-                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+    monkeypatch.setattr("setpoint.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".setpoint", "")))
 
     lock = threading.Lock()
     state = {"cur": 0, "max": 0}
@@ -72,10 +72,10 @@ def test_run_fleet_honors_concurrency(tmp_path, monkeypatch):
 
 
 def test_run_fleet_stop_sentinel_skips_unstarted(tmp_path, monkeypatch):
-    from loom import fleet
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
-    monkeypatch.setattr("loom.spec.load_spec",
-                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+    monkeypatch.setattr("setpoint.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".setpoint", "")))
     (tmp_path / "runs").mkdir(parents=True)
     # Pre-create the sentinel; run_fleet clears it at start, so create it via a
     # run_loop that re-touches it after the first member.
@@ -95,11 +95,11 @@ def test_run_fleet_stop_sentinel_skips_unstarted(tmp_path, monkeypatch):
 
 def test_fleet_status_renders_from_state(tmp_path, monkeypatch):
     import json
-    from loom import fleet
+    from setpoint import fleet
     runs = tmp_path / "runs"
     monkeypatch.setattr(fleet, "_runs_root", lambda: runs)
-    monkeypatch.setattr("loom.spec.load_spec",
-                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+    monkeypatch.setattr("setpoint.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".setpoint", "")))
     (runs / "m0").mkdir(parents=True)
     (runs / "m0" / "state.json").write_text(json.dumps(
         {"name": "m0", "status": "passed", "iters": [{"n": 1}], "spent_usd": 0.0}))
@@ -115,26 +115,26 @@ def test_fleet_keys_by_spec_name_not_filename_stem(tmp_path, monkeypatch):
     `name:` (e.g. the scribe fleet names files by task but sets name: CS-###).
     Both fleet_status and run_fleet must key/lookup by the spec name."""
     import json
-    from loom import fleet
+    from setpoint import fleet
     runs = tmp_path / "runs"
     monkeypatch.setattr(fleet, "_runs_root", lambda: runs)
 
     def fake_load_spec(p):
-        if Path(p).name == "task-a.loom.yaml":
+        if Path(p).name == "task-a.setpoint.yaml":
             return SimpleNamespace(name="CS-100")
         return SimpleNamespace(name=Path(p).stem)
 
-    monkeypatch.setattr("loom.spec.load_spec", fake_load_spec)
+    monkeypatch.setattr("setpoint.spec.load_spec", fake_load_spec)
 
     # The run directory is keyed by the spec name, not the filename stem.
     (runs / "CS-100").mkdir(parents=True)
     (runs / "CS-100" / "state.json").write_text(json.dumps(
         {"name": "CS-100", "status": "passed", "iters": [], "spent_usd": 0.0}))
 
-    member = tmp_path / "task-a.loom.yaml"
+    member = tmp_path / "task-a.setpoint.yaml"
     member.write_text("name: CS-100\n")
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: f\nconcurrency: 1\nmembers:\n  - task-a.loom.yaml\n")
+    fp.write_text("name: f\nconcurrency: 1\nmembers:\n  - task-a.setpoint.yaml\n")
 
     out = fleet.fleet_status(str(fp))
     status_line = next(l for l in out.splitlines() if l.startswith("CS-100"))
@@ -150,10 +150,10 @@ def test_fleet_keys_by_spec_name_not_filename_stem(tmp_path, monkeypatch):
 
 def test_run_fleet_raises_on_duplicate_member_names(tmp_path, monkeypatch):
     """Two members that resolve to the same spec name would race the same
-    ~/.loom/runs/<name>/ state — fail fast instead of corrupting state."""
-    from loom import fleet
+    ~/.setpoint/runs/<name>/ state — fail fast instead of corrupting state."""
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
-    monkeypatch.setattr("loom.spec.load_spec",
+    monkeypatch.setattr("setpoint.spec.load_spec",
                         lambda p: SimpleNamespace(name="dup"))
 
     fp, names = _make_fleet(tmp_path, n=2, concurrency=2)
@@ -168,10 +168,10 @@ def test_run_fleet_raises_on_duplicate_member_names(tmp_path, monkeypatch):
 def test_run_fleet_member_run_loop_error_isolated(tmp_path, monkeypatch):
     """A single member's run_loop raising must not crash the fleet -- the
     other members still run and the fleet returns a full status dict."""
-    from loom import fleet
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
-    monkeypatch.setattr("loom.spec.load_spec",
-                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".loom", "")))
+    monkeypatch.setattr("setpoint.spec.load_spec",
+                        lambda p: SimpleNamespace(name=Path(p).stem.replace(".setpoint", "")))
 
     def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
         if spec.name == "m0":
@@ -189,15 +189,15 @@ def test_run_fleet_member_run_loop_error_isolated(tmp_path, monkeypatch):
 def test_run_fleet_member_load_spec_error_isolated(tmp_path, monkeypatch):
     """A single member with an unparseable spec must not crash the fleet --
     it is recorded as 'error' while the other members complete normally."""
-    from loom import fleet
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
 
     def fake_load_spec(p):
-        if Path(p).name == "m0.loom.yaml":
+        if Path(p).name == "m0.setpoint.yaml":
             raise ValueError("unparseable spec")
-        return SimpleNamespace(name=Path(p).stem.replace(".loom", ""))
+        return SimpleNamespace(name=Path(p).stem.replace(".setpoint", ""))
 
-    monkeypatch.setattr("loom.spec.load_spec", fake_load_spec)
+    monkeypatch.setattr("setpoint.spec.load_spec", fake_load_spec)
 
     def fake_run_loop(spec, *, fresh=False, ui=None, abort_check=None):
         return SimpleNamespace(status="passed")
@@ -212,9 +212,9 @@ def test_run_fleet_member_load_spec_error_isolated(tmp_path, monkeypatch):
 
 def test_member_name_strips_only_the_suffix():
     from pathlib import Path
-    from loom.fleet import _member_name
+    from setpoint.fleet import _member_name
 
     # a run legitimately named "deploy.loomtest" must survive intact
-    assert _member_name(Path("/x/.loom/deploy.loomtest.loom.yaml")) == "deploy.loomtest"
-    assert _member_name(Path("/x/.loom/plain.loom.yaml")) == "plain"
-    assert _member_name(Path("/x/.loom/nosuffix.yaml")) == "nosuffix"
+    assert _member_name(Path("/x/.setpoint/deploy.loomtest.setpoint.yaml")) == "deploy.loomtest"
+    assert _member_name(Path("/x/.setpoint/plain.setpoint.yaml")) == "plain"
+    assert _member_name(Path("/x/.setpoint/nosuffix.yaml")) == "nosuffix"

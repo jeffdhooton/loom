@@ -13,7 +13,7 @@ _sleep = time.sleep  # module-level so tests can monkeypatch without real delays
 _RETRY_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 
 # Connection-level failures that carry no status code. Matched by class name so
-# loom does not have to import provider-specific exception hierarchies.
+# setpoint does not have to import provider-specific exception hierarchies.
 _RETRY_NAMES = frozenset({
     "APIConnectionError", "APITimeoutError", "APIError", "InternalServerError",
     "RateLimitError", "ConnectionError", "ConnectionResetError", "Timeout",

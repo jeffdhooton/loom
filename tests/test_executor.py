@@ -2,10 +2,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from loom.executor.base import ExecEvent
-from loom.executor.deepseek import DeepSeekExecutor
-from loom.tools import build_registry
-from loom.budget import PRICING
+from setpoint.executor.base import ExecEvent
+from setpoint.executor.deepseek import DeepSeekExecutor
+from setpoint.tools import build_registry
+from setpoint.budget import PRICING
 
 
 def _msg(content=None, tool_calls=None, reasoning_content=None):
@@ -131,7 +131,7 @@ class RateLimitError(Exception):
 
 
 def test_executor_retries_transient_api_errors(tmp_path, monkeypatch):
-    from loom import retry
+    from setpoint import retry
     monkeypatch.setattr(retry, "_sleep", lambda s: None)
 
     client = FlakyClient([_resp(_msg(content="recovered"))], fail_times=2)
@@ -146,7 +146,7 @@ def test_executor_retries_transient_api_errors(tmp_path, monkeypatch):
 
 
 def test_executor_does_not_retry_permanent_api_errors(tmp_path, monkeypatch):
-    from loom import retry
+    from setpoint import retry
     monkeypatch.setattr(retry, "_sleep", lambda s: None)
 
     class BadKey(FakeClient):

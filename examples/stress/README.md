@@ -1,4 +1,4 @@
-# loom stress sweep
+# setpoint stress sweep
 
 A three-stage stress test that exercises the **closed loop itself** — the part every
 prior validation skipped, because every prior run passed on iteration 1. Each stage
@@ -29,23 +29,23 @@ bash examples/stress/setup.sh                          # bootstrap working dirs
 
 # Stage 1 — judge self-correction (680w fluff → 220–320w quality brief).
 #   needs DEEPSEEK_API_KEY + local ollama (qwen3.6:27b)
-loom run examples/stress-content.loom.yaml --fresh
+setpoint run examples/stress-content.setpoint.yaml --fresh
 
 # Stage 2 — coding self-correction (fix 6 bugs → pytest green; has bash + markers).
-loom run examples/stress-coding.loom.yaml --fresh
+setpoint run examples/stress-coding.setpoint.yaml --fresh
 
 # Stage 2b — BLIND coding (no bash, no markers; gate feedback is the only signal).
-loom run examples/stress-coding-blind.loom.yaml --fresh
+setpoint run examples/stress-coding-blind.setpoint.yaml --fresh
 
 # Stage 3 — endurance / graceful give-up (unsatisfiable target → long spine → stop).
-loom run examples/stress-endurance.loom.yaml --fresh
-loom resume examples/stress-endurance.loom.yaml        # demonstrate resume mid-spine
+setpoint run examples/stress-endurance.setpoint.yaml --fresh
+setpoint resume examples/stress-endurance.setpoint.yaml        # demonstrate resume mid-spine
 
 # Stage 4 — multi-iter self-correction via a HIDDEN oracle (no bash, can't read tests).
-loom run examples/stress-feature-hidden.loom.yaml --fresh
+setpoint run examples/stress-feature-hidden.setpoint.yaml --fresh
 
-loom ls                                                # statuses + spend
-loom logs stress-coding-multibug                       # read the memory spine
+setpoint ls                                                # statuses + spend
+setpoint logs stress-coding-multibug                       # read the memory spine
 ```
 
 ## What each stage proves
@@ -58,7 +58,7 @@ loom logs stress-coding-multibug                       # read the memory spine
 - **Stage 3** — against an unsatisfiable target the loop fixes what it can, then stops
   *gracefully* (no_progress / max_iters) over a long spine and reports honestly —
   with accurate cumulative budget accounting — instead of spinning forever or faking
-  success. `loom resume` continues the same spine.
+  success. `setpoint resume` continues the same spine.
 - **Stage 4** — the executor cannot self-verify (no `bash`) and cannot read the
   acceptance suite (it lives outside the worktree, run by the gate). Its first
   implementation misses edge cases; the gate's failing-test output is the only signal,
@@ -75,7 +75,7 @@ loom logs stress-coding-multibug                       # read the memory spine
 | 3 endurance | stopped | 6 (→12 on resume) | $0.06 | graceful give-up at no_progress; honest "stopped"; budget accounting exact |
 | 4 hidden-oracle | passed | **2** | $0.03 | **genuine self-correction**: iter 1 missed `from_roman('MCMXCIV')`; gate leaked it; iter 2 fixed → 62/62 |
 
-**The headline finding:** loom's **outer loop only iterates when a single EXECUTE pass
+**The headline finding:** setpoint's **outer loop only iterates when a single EXECUTE pass
 cannot finish *or verify* the task**. Because EXECUTE is itself a full agentic tool-loop,
 a capable model (DeepSeek-v4) one-shots small, well-specified tasks — *even when denied
 `bash`* (Stage 2b). The outer DISCOVER→PLAN→EXECUTE→VERIFY→ITERATE cycle reliably engages
@@ -86,6 +86,6 @@ self-correction: hide the oracle and remove the executor's ability to run it. No
 Stage 4 agent *tried* to build its own test harness and *tried* to read the hidden test —
 both denied — which is precisely what forced it onto the gate's feedback.
 
-**Rough edge:** `loom resume` restarts iteration numbering (spine showed n = 1..6, 1..6
+**Rough edge:** `setpoint resume` restarts iteration numbering (spine showed n = 1..6, 1..6
 rather than 1..12). The spine and budget totals are intact; only the per-iter `n` label
 duplicates. Candidate fix: seed `n` from `len(existing_iters)` on resume.

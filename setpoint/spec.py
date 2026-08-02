@@ -167,9 +167,9 @@ def load_spec(path: str) -> LoopSpec:
 
     deliver = raw.get("deliver") or {}
     if deliver.get("merge"):
-        raise ValueError("deliver.merge must be false — loom never merges to main")
+        raise ValueError("deliver.merge must be false — setpoint never merges to main")
     if str(deliver.get("branch") or "").lower() in {"main", "master"}:
-        raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
+        raise ValueError("deliver.branch must not be main/master — setpoint never touches the trunk")
     if deliver.get("branch") and deliver.get("base") and \
             str(deliver["branch"]).lower() == str(deliver["base"]).lower():
         raise ValueError("deliver.base must differ from deliver.branch")

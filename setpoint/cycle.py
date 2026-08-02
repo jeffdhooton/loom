@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from loom.budget import Budget, Usage
-from loom.memory import IterRecord, Memory, RunState
-from loom.retry import with_retries
-from loom.tools import build_registry
+from setpoint.budget import Budget, Usage
+from setpoint.memory import IterRecord, Memory, RunState
+from setpoint.retry import with_retries
+from setpoint.tools import build_registry
 
 _CUTOFF_NOTE = """
 NOTE: the previous EXECUTE stage was cut off ({reason}) before the agent

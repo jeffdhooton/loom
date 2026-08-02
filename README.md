@@ -1,16 +1,16 @@
-# loom
+# setpoint
 
-[![tests](https://github.com/jeffdhooton/loom/actions/workflows/tests.yml/badge.svg)](https://github.com/jeffdhooton/loom/actions/workflows/tests.yml)
+[![tests](https://github.com/jeffdhooton/setpoint/actions/workflows/tests.yml/badge.svg)](https://github.com/jeffdhooton/setpoint/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 
-A closed-loop engine for AI agents. Given a spec file, loom runs
+A closed-loop engine for AI agents. Given a spec file, setpoint runs
 DISCOVER → PLAN → EXECUTE → VERIFY → ITERATE until the work passes a real,
 deterministic gate — or hits an iteration, budget, or wall-clock limit.
 Progress streams in real time and is watchable in tmux.
 
 The thesis: loops beat one-shot prompting, but only if the verify gate is
-real (an exit code, not vibes) and the loop is affordable. loom's default
+real (an exit code, not vibes) and the loop is affordable. setpoint's default
 executor drives a cheap frontier-class model (DeepSeek-v4) through its own
 tool-calling loop; alternatively it shells out to the Claude Code or Codex
 CLI and lets that agent own the EXECUTE stage. Either way, the gate — not
@@ -18,7 +18,7 @@ the model's self-assessment — decides when the work is done.
 
 ## Install
 
-macOS or Linux (loom manages gate subprocesses with POSIX process groups;
+macOS or Linux (setpoint manages gate subprocesses with POSIX process groups;
 Windows is not supported). Python 3.11+.
 
 ```bash
@@ -44,34 +44,34 @@ cp .env.example .env
 
 ```bash
 bash examples/setup.sh                 # create the sandbox: a repo with one failing test
-loom run examples/coding.loom.yaml     # watch the loop fix it until pytest passes
+setpoint run examples/coding.setpoint.yaml     # watch the loop fix it until pytest passes
 ```
 
 ## Usage
 
 ```bash
-loom run examples/coding.loom.yaml          # run a coding loop
-loom run examples/content.loom.yaml         # run a content loop
-loom run examples/coding.loom.yaml --fresh  # discard prior state and restart
-loom resume examples/coding.loom.yaml       # continue a stopped run (numbering continues)
-loom ls                                     # list all runs with status + spend
-loom logs <name>                            # print the markdown log for a run
-loom fleet run examples/fleet-demo.yaml     # run several loops as a supervised fleet
-loom fleet status examples/fleet-demo.yaml  # fleet dashboard (table + status.md)
-loom fleet stop                             # request a graceful fleet stop
+setpoint run examples/coding.setpoint.yaml          # run a coding loop
+setpoint run examples/content.setpoint.yaml         # run a content loop
+setpoint run examples/coding.setpoint.yaml --fresh  # discard prior state and restart
+setpoint resume examples/coding.setpoint.yaml       # continue a stopped run (numbering continues)
+setpoint ls                                     # list all runs with status + spend
+setpoint logs <name>                            # print the markdown log for a run
+setpoint fleet run examples/fleet-demo.yaml     # run several loops as a supervised fleet
+setpoint fleet status examples/fleet-demo.yaml  # fleet dashboard (table + status.md)
+setpoint fleet stop                             # request a graceful fleet stop
 ```
 
 ## Loop specs
 
-A loop spec (`.loom.yaml`) declares everything loom needs: the goal, the
+A loop spec (`.setpoint.yaml`) declares everything setpoint needs: the goal, the
 workspace repo, which models to use for planning and execution, the verify
 gate (a shell command or an LLM judge with a rubric), stop conditions, and
 a budget cap.
 
-`examples/coding.loom.yaml` shows a coding loop that runs pytest as its gate.
-`examples/content.loom.yaml` shows a content loop where a judge model scores
+`examples/coding.setpoint.yaml` shows a coding loop that runs pytest as its gate.
+`examples/content.setpoint.yaml` shows a content loop where a judge model scores
 the output against a rubric and iterates until the score meets the threshold.
-`examples/agent-coding.loom.yaml` shows an agent-engine coding loop (see
+`examples/agent-coding.setpoint.yaml` shows an agent-engine coding loop (see
 "Engines" below).
 
 ### Command gates
@@ -92,7 +92,7 @@ gate runs in its own process session with a timeout, so a hung command (or
 one that leaks a background child holding the output pipe) fails the
 iteration instead of hanging the loop.
 
-**Preflight:** before iteration 1, loom runs the gate once, cold. A gate
+**Preflight:** before iteration 1, setpoint runs the gate once, cold. A gate
 whose command can't even execute (exit 126/127) or that hangs cold can
 never pass, so the run aborts immediately with status `gate_error` rather
 than burning `max_iters` discovering it. A normal cold failure instead
@@ -103,7 +103,7 @@ staged state.
 ### Engines
 
 `execute.engine` selects who drives the EXECUTE stage: `deepseek` (default —
-loom's own tool-calling loop against the DeepSeek API) or `claude` / `codex`
+setpoint's own tool-calling loop against the DeepSeek API) or `claude` / `codex`
 (shell out to the `claude` / `codex` CLI as a subprocess and let that agent
 own its own tool use — read/write/edit/bash — inside the workspace). Agent
 engines are subscription-based and **unmetered on tokens** (priced at $0 in
@@ -120,21 +120,21 @@ spec's `deliver:` block, e.g. `gates/judge.py`) to have the grader review the
 
 A `deliver:` block (`branch`, `push`, `pr`, `sheet_task`, `notify`) opens a
 feature branch, pushes it, and opens a PR via `gh` on a **passed** run —
-loom **never merges to `main` and never deploys**; every side-effecting
-command loom emits is restricted to `git`/`gh`/`gog` (`gog` is a Google
+setpoint **never merges to `main` and never deploys**; every side-effecting
+command setpoint emits is restricted to `git`/`gh`/`gog` (`gog` is a Google
 Workspace CLI, invoked only if the optional `deliver.sheet_task` tracker
 hook is configured), and `deliver.merge` is rejected at spec load time. On a run that does not pass, `deliver` instead
 writes a local `report.md` and takes no git action.
 
 ## Local judge (content loops)
 
-Content loops use a local LLM judge via ollama at `http://localhost:11434/v1` (OpenAI-compatible). The default judge model is `qwen3.6:27b`. To override the endpoint, set `LOOM_JUDGE_BASE_URL` (e.g. `export LOOM_JUDGE_BASE_URL=http://127.0.0.1:8000/v1` to point at OMLX instead). Thinking models (such as qwen3) are handled automatically — loom passes `reasoning_effort: "none"` so they return clean JSON rather than empty content. DeepSeek judge models skip ollama and reuse the main DeepSeek client.
+Content loops use a local LLM judge via ollama at `http://localhost:11434/v1` (OpenAI-compatible). The default judge model is `qwen3.6:27b`. To override the endpoint, set `SETPOINT_JUDGE_BASE_URL` (e.g. `export SETPOINT_JUDGE_BASE_URL=http://127.0.0.1:8000/v1` to point at OMLX instead). Thinking models (such as qwen3) are handled automatically — setpoint passes `reasoning_effort: "none"` so they return clean JSON rather than empty content. DeepSeek judge models skip ollama and reuse the main DeepSeek client.
 
 ## Security note
 
-loom executes model-generated shell commands and file writes inside the
+setpoint executes model-generated shell commands and file writes inside the
 configured workspace repo. Confinement is workspace-level (the cwd is set
-to the repo), not a strict sandbox. Run loom only on repos or worktrees you
+to the repo), not a strict sandbox. Run setpoint only on repos or worktrees you
 trust — treat it the same as running an AI coding agent on your machine.
 
 ## Optional integrations

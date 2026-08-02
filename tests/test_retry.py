@@ -1,7 +1,7 @@
 import pytest
 
-from loom import retry
-from loom.retry import is_transient, with_retries
+from setpoint import retry
+from setpoint.retry import is_transient, with_retries
 
 
 class _Status(Exception):

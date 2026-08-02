@@ -17,10 +17,10 @@ def make_deepseek_client() -> OpenAI:
 
 def make_judge_client(model: str, engine: str | None = None):
     if engine in ("claude", "codex"):
-        from loom.gates.agent_judge import AgentJudgeClient
+        from setpoint.gates.agent_judge import AgentJudgeClient
         return AgentJudgeClient(engine=engine)
     # local OMLX/ollama models are free and keyless; DeepSeek judge models reuse the main client
     if model.startswith("deepseek"):
         return make_deepseek_client()
-    base = os.environ.get("LOOM_JUDGE_BASE_URL", OLLAMA_BASE)
+    base = os.environ.get("SETPOINT_JUDGE_BASE_URL", OLLAMA_BASE)
     return OpenAI(base_url=base, api_key="local")

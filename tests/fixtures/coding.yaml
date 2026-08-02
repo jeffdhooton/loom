@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: /tmp/demo
   worktree: true
-  branch: loom/demo
+  branch: setpoint/demo
 context:
   files: [VISION.md]
   scry: true

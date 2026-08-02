@@ -5,7 +5,7 @@ import signal
 import subprocess
 from pathlib import Path
 
-from loom.clip import clip
+from setpoint.clip import clip
 from . import Tool, ToolContext, _fn
 
 # Tool output is re-sent on every subsequent turn, so an unbounded result does
