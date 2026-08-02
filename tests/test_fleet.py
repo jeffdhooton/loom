@@ -218,3 +218,6 @@ def test_member_name_strips_only_the_suffix():
     assert _member_name(Path("/x/.setpoint/deploy.loomtest.setpoint.yaml")) == "deploy.loomtest"
     assert _member_name(Path("/x/.setpoint/plain.setpoint.yaml")) == "plain"
     assert _member_name(Path("/x/.setpoint/nosuffix.yaml")) == "nosuffix"
+    # legacy suffix: un-migrated fleets (still on ".loom.yaml" members) must
+    # keep resolving their run keys too
+    assert _member_name(Path("/x/.setpoint/plain.loom.yaml")) == "plain"
