@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -75,7 +76,13 @@ class LoopSpec:
 
 
 def load_spec(path: str) -> LoopSpec:
-    raw = yaml.safe_load(Path(path).expanduser().read_text()) or {}
+    p = Path(path).expanduser()
+    if p.name.endswith(".loom.yaml"):
+        print(f"warning: '{p.name}' uses the deprecated .loom.yaml extension, which "
+              f"will stop loading in the next minor.\n"
+              f"         run: setpoint migrate {p.parent.parent}",
+              file=sys.stderr)
+    raw = yaml.safe_load(p.read_text()) or {}
 
     for required in ("name", "goal", "type"):
         if not raw.get(required):

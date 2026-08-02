@@ -267,3 +267,35 @@ def test_verify_timeout_and_preflight_defaults(tmp_path):
     spec = load_spec(str(p))
     assert spec.verify.timeout_secs == 600
     assert spec.verify.preflight is True
+
+
+def _minimal_spec_text(tmp_path):
+    return (
+        f"name: dep\ngoal: g\ntype: coding\n"
+        f"workspace:\n  repo: {tmp_path}\n"
+        f"verify:\n  gate: command\n  command: 'true'\n"
+    )
+
+
+def test_legacy_loom_extension_still_loads_and_warns(tmp_path, capsys):
+    from setpoint.spec import load_spec
+
+    p = tmp_path / "old.loom.yaml"
+    p.write_text(_minimal_spec_text(tmp_path))
+
+    spec = load_spec(str(p))
+    assert spec.name == "dep"  # still loads
+
+    err = capsys.readouterr().err
+    assert "deprecated" in err
+    assert "setpoint migrate" in err
+
+
+def test_new_extension_is_silent(tmp_path, capsys):
+    from setpoint.spec import load_spec
+
+    p = tmp_path / "new.setpoint.yaml"
+    p.write_text(_minimal_spec_text(tmp_path))
+
+    load_spec(str(p))
+    assert capsys.readouterr().err == ""
