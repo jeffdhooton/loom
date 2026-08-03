@@ -1,5 +1,5 @@
 import pytest
-from loom.spec import load_spec
+from setpoint.spec import load_spec
 
 
 def test_load_coding_spec():
@@ -7,7 +7,7 @@ def test_load_coding_spec():
     assert s.name == "demo-coding"
     assert s.type == "coding"
     assert s.workspace.worktree is True
-    assert s.workspace.branch == "loom/demo"
+    assert s.workspace.branch == "setpoint/demo"
     assert s.context.files == ["VISION.md"]
     assert s.execute.plan_model == "deepseek-v4-pro"
     assert s.execute.model == "deepseek-v4-flash"
@@ -64,8 +64,8 @@ def test_load_spec_expands_tilde_in_path(tmp_path, monkeypatch):
 
 
 def test_engine_defaults_to_deepseek(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -77,8 +77,8 @@ def test_engine_defaults_to_deepseek(tmp_path):
 
 
 def test_engine_claude_and_wall_clock_parse(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -93,8 +93,8 @@ def test_engine_claude_and_wall_clock_parse(tmp_path):
 
 def test_invalid_engine_rejected(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -107,8 +107,8 @@ def test_invalid_engine_rejected(tmp_path):
 
 def test_judge_engine_same_as_executor_engine_rejected(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: content\n"
         "workspace:\n  repo: .\n"
@@ -122,8 +122,8 @@ def test_judge_engine_same_as_executor_engine_rejected(tmp_path):
 
 def test_deliver_merge_true_rejected(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -136,8 +136,8 @@ def test_deliver_merge_true_rejected(tmp_path):
 
 def test_deliver_branch_main_rejected(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -152,8 +152,8 @@ def test_agent_engine_without_model_defaults_to_engine_sentinel(tmp_path):
     # Regression: engine:claude with no execute.model must NOT inherit the
     # deepseek default ("deepseek-v4-flash"), which the claude CLI rejects with
     # a 404. It must default to the "claude" sentinel so _claude_argv omits --model.
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -164,8 +164,8 @@ def test_agent_engine_without_model_defaults_to_engine_sentinel(tmp_path):
 
 
 def test_agent_engine_respects_explicit_model(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -176,8 +176,8 @@ def test_agent_engine_respects_explicit_model(tmp_path):
 
 
 def test_deepseek_engine_keeps_default_model(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: content\n"
         "workspace:\n  repo: .\n"
@@ -188,8 +188,8 @@ def test_deepseek_engine_keeps_default_model(tmp_path):
 
 def test_deliver_base_equal_branch_rejected(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -201,8 +201,8 @@ def test_deliver_base_equal_branch_rejected(tmp_path):
 
 
 def test_deliver_base_develop_accepted(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -215,8 +215,8 @@ def test_deliver_base_develop_accepted(tmp_path):
 
 def test_judge_engine_set_must_differ_from_execute_engine_regardless_of_model(tmp_path):
     import pytest
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: content\n"
         "workspace:\n  repo: .\n"
@@ -229,8 +229,8 @@ def test_judge_engine_set_must_differ_from_execute_engine_regardless_of_model(tm
 
 
 def test_judge_engine_cross_engine_still_loads(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: content\n"
         "workspace:\n  repo: .\n"
@@ -243,8 +243,8 @@ def test_judge_engine_cross_engine_still_loads(tmp_path):
 
 
 def test_verify_timeout_and_preflight_parse(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -257,8 +257,8 @@ def test_verify_timeout_and_preflight_parse(tmp_path):
 
 
 def test_verify_timeout_and_preflight_defaults(tmp_path):
-    from loom.spec import load_spec
-    p = tmp_path / "s.loom.yaml"
+    from setpoint.spec import load_spec
+    p = tmp_path / "s.setpoint.yaml"
     p.write_text(
         "name: t\ngoal: g\ntype: coding\n"
         "workspace:\n  repo: .\n"
@@ -267,3 +267,38 @@ def test_verify_timeout_and_preflight_defaults(tmp_path):
     spec = load_spec(str(p))
     assert spec.verify.timeout_secs == 600
     assert spec.verify.preflight is True
+
+
+def _minimal_spec_text(tmp_path):
+    return (
+        f"name: dep\ngoal: g\ntype: coding\n"
+        f"workspace:\n  repo: {tmp_path}\n"
+        f"verify:\n  gate: command\n  command: 'true'\n"
+    )
+
+
+def test_legacy_loom_extension_still_loads_and_warns(tmp_path, capsys):
+    from setpoint.spec import load_spec
+
+    p = tmp_path / "old.loom.yaml"
+    p.write_text(_minimal_spec_text(tmp_path))
+
+    spec = load_spec(str(p))
+    assert spec.name == "dep"  # still loads
+
+    captured = capsys.readouterr()
+    assert "deprecated" in captured.err
+    assert "setpoint migrate" in captured.err
+    assert captured.out == ""
+
+
+def test_new_extension_is_silent(tmp_path, capsys):
+    from setpoint.spec import load_spec
+
+    p = tmp_path / "new.setpoint.yaml"
+    p.write_text(_minimal_spec_text(tmp_path))
+
+    load_spec(str(p))
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""

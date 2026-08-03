@@ -5,15 +5,15 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from loom.budget import Usage
-from loom.tools import Tool
+from setpoint.budget import Usage
+from setpoint.tools import Tool
 from .base import ExecEvent, ExecuteResult, Executor
 
 
 class AgentCLIExecutor(Executor):
-    """Drive a CLI coding agent (Claude Code / Codex) as a loom executor.
+    """Drive a CLI coding agent (Claude Code / Codex) as a setpoint executor.
 
-    Unlike DeepSeekExecutor, the agent owns its own tools; loom passes the
+    Unlike DeepSeekExecutor, the agent owns its own tools; setpoint passes the
     composed prompt, sets cwd to the worktree, and captures the final text +
     usage. A failed agent turn never raises — it is just an unproductive
     iteration the gate will fail.
@@ -49,7 +49,7 @@ class AgentCLIExecutor(Executor):
         except subprocess.TimeoutExpired:
             on_event(ExecEvent("note", {"text": f"agent timeout after {timeout}s"}))
             return ExecuteResult(text=f"[agent timeout after {timeout}s]",
-                                 usage=Usage(), steps=[])
+                                 usage=Usage(), steps=[], stop_reason="timeout")
         except FileNotFoundError as e:
             on_event(ExecEvent("note", {"text": f"agent binary not found: {argv[0]} ({e})"}))
             return ExecuteResult(text=f"[agent binary not found: {argv[0]}]",

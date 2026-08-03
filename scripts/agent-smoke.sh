@@ -15,5 +15,5 @@ printf '{"type":"result","result":"fixed calc.py","usage":{"input_tokens":10,"ou
 EOF
 chmod +x "$STUB_DIR/claude"
 
-PATH="$STUB_DIR:$PATH" loom run examples/agent-coding.loom.yaml --fresh
+PATH="$STUB_DIR:$PATH" setpoint run examples/agent-coding.setpoint.yaml --fresh
 echo "smoke: exit $?"

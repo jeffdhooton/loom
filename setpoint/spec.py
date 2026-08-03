@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -75,7 +76,15 @@ class LoopSpec:
 
 
 def load_spec(path: str) -> LoopSpec:
-    raw = yaml.safe_load(Path(path).expanduser().read_text()) or {}
+    p = Path(path).expanduser()
+    # Emit deprecation warning before read_text() so users still get the tip
+    # even if the file is missing or unreadable.
+    if p.name.endswith(".loom.yaml"):
+        print(f"warning: '{p.name}' uses the deprecated .loom.yaml extension, which "
+              f"will stop loading in the next minor.\n"
+              f"         run: setpoint migrate {p.parent.parent}",
+              file=sys.stderr)
+    raw = yaml.safe_load(p.read_text()) or {}
 
     for required in ("name", "goal", "type"):
         if not raw.get(required):
@@ -167,9 +176,9 @@ def load_spec(path: str) -> LoopSpec:
 
     deliver = raw.get("deliver") or {}
     if deliver.get("merge"):
-        raise ValueError("deliver.merge must be false — loom never merges to main")
+        raise ValueError("deliver.merge must be false — setpoint never merges to main")
     if str(deliver.get("branch") or "").lower() in {"main", "master"}:
-        raise ValueError("deliver.branch must not be main/master — loom never touches the trunk")
+        raise ValueError("deliver.branch must not be main/master — setpoint never touches the trunk")
     if deliver.get("branch") and deliver.get("base") and \
             str(deliver["branch"]).lower() == str(deliver["base"]).lower():
         raise ValueError("deliver.base must differ from deliver.branch")

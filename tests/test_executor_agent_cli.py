@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from loom.executor import ClaudeExecutor, CodexExecutor
+from setpoint.executor import ClaudeExecutor, CodexExecutor
 
 
 class _FakeCompleted:

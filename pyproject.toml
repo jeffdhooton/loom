@@ -1,6 +1,6 @@
 [project]
-name = "loom"
-version = "0.1.0"
+name = "setpoint"
+version = "0.2.0"
 description = "Closed-loop engine for AI agents: DISCOVER -> PLAN -> EXECUTE -> VERIFY -> ITERATE until a real gate passes"
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,18 +29,18 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Repository = "https://github.com/jeffdhooton/loom"
-Issues = "https://github.com/jeffdhooton/loom/issues"
+Repository = "https://github.com/jeffdhooton/setpoint"
+Issues = "https://github.com/jeffdhooton/setpoint/issues"
 
 [project.scripts]
-loom = "loom.__main__:main"
+setpoint = "setpoint.__main__:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["loom*"]
+include = ["setpoint*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

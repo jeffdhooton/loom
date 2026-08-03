@@ -12,7 +12,7 @@ class Worktree:
         self.path: Path | None = None
 
     def create(self) -> Path:
-        target = Path(tempfile.mkdtemp(prefix="loom-wt-"))
+        target = Path(tempfile.mkdtemp(prefix="setpoint-wt-"))
         # -B resets the branch if it already exists (resume-friendly)
         subprocess.run(
             ["git", "worktree", "add", "-B", self.branch, str(target)],
@@ -33,7 +33,7 @@ class Worktree:
 
 def prepare_workspace(spec) -> tuple[Path, Worktree | None]:
     if spec.workspace.worktree:
-        branch = spec.workspace.branch or f"loom/{spec.name}"
+        branch = spec.workspace.branch or f"setpoint/{spec.name}"
         wt = Worktree(repo=spec.workspace.repo, branch=branch)
         return wt.create(), wt
     return spec.workspace.repo, None

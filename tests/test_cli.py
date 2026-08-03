@@ -3,9 +3,9 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
-import loom.__main__ as cli
-from loom.executor.base import ExecuteResult
-from loom.budget import Usage
+import setpoint.__main__ as cli
+from setpoint.executor.base import ExecuteResult
+from setpoint.budget import Usage
 
 
 def _make_repo(tmp_path) -> Path:
@@ -39,7 +39,7 @@ def test_cmd_run_converges(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "_build_executor", lambda spec: WinningExecutor())
     monkeypatch.setattr(cli, "_build_plan_client",
                         lambda spec: _fake_plan_client())
-    monkeypatch.setenv("LOOM_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("SETPOINT_RUNS_ROOT", str(tmp_path / "runs"))
 
     rc = cli.main(["run", str(spec)])
     assert rc == 0
@@ -56,17 +56,17 @@ def _fake_plan_client():
 
 
 def test_ls_empty(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("LOOM_RUNS_ROOT", str(tmp_path / "runs"))
+    monkeypatch.setenv("SETPOINT_RUNS_ROOT", str(tmp_path / "runs"))
     assert cli.main(["ls"]) == 0
 
 
 def test_build_executor_selects_engine(tmp_path, monkeypatch):
-    from loom import __main__ as m
-    from loom.executor import ClaudeExecutor, CodexExecutor, DeepSeekExecutor
-    from loom.executor.agent_plan import AgentPlanClient
+    from setpoint import __main__ as m
+    from setpoint.executor import ClaudeExecutor, CodexExecutor, DeepSeekExecutor
+    from setpoint.executor.agent_plan import AgentPlanClient
 
     def spec_with(engine):
-        from loom.spec import ExecuteCfg
+        from setpoint.spec import ExecuteCfg
         class S:  # minimal stand-in
             execute = ExecuteCfg(engine=engine)
         return S()
@@ -81,8 +81,8 @@ def test_build_executor_selects_engine(tmp_path, monkeypatch):
 
 def test_run_loop_is_reused_by_cmd_run(monkeypatch, tmp_path):
     # cmd_run delegates to run_loop and maps status to an exit code.
-    from loom import __main__ as m
-    from loom.memory import RunState
+    from setpoint import __main__ as m
+    from setpoint.memory import RunState
 
     called = {}
 
@@ -94,26 +94,77 @@ def test_run_loop_is_reused_by_cmd_run(monkeypatch, tmp_path):
         called["fresh"] = fresh
         return RunState(name="x", status="passed")
 
-    monkeypatch.setattr("loom.spec.load_spec", fake_load_spec)
+    monkeypatch.setattr("setpoint.spec.load_spec", fake_load_spec)
     monkeypatch.setattr(m, "run_loop", fake_run_loop)
     assert m.cmd_run("some.yaml", fresh=True) == 0
     assert called["path"] == "some.yaml" and called["fresh"] is True
 
 
 def test_fleet_stop_creates_sentinel(monkeypatch, tmp_path):
-    from loom import __main__ as m
-    from loom import fleet
+    from setpoint import __main__ as m
+    from setpoint import fleet
     monkeypatch.setattr(fleet, "_runs_root", lambda: tmp_path / "runs")
     assert m.main(["fleet", "stop"]) == 0
     assert fleet.stop_sentinel_path().exists()
 
 
 def test_fleet_run_dispatches(monkeypatch, tmp_path):
-    from loom import __main__ as m
-    from loom import fleet
+    from setpoint import __main__ as m
+    from setpoint import fleet
     called = {}
     monkeypatch.setattr(fleet, "run_fleet",
                         lambda p, **k: called.setdefault("run", p) and {"a": "passed"})
     monkeypatch.setattr(fleet, "fleet_status", lambda p: "STATUS")
     rc = m.main(["fleet", "run", "f.yaml"])
     assert rc == 0 and called["run"] == "f.yaml"
+
+
+def _loom_repo(tmp_path) -> Path:
+    repo = tmp_path / "dep"
+    (repo / ".loom").mkdir(parents=True)
+    (repo / ".loom" / "one.loom.yaml").write_text("name: one\n")
+    (repo / ".loom" / "fleet.yaml").write_text("name: f\nmembers:\n  - one.loom.yaml\n")
+    return repo
+
+
+def test_migrate_dry_run_changes_nothing(tmp_path, capsys):
+    repo = _loom_repo(tmp_path)
+    assert cli.main(["migrate", str(repo), "--dry-run"]) == 0
+    assert (repo / ".loom" / "one.loom.yaml").exists()
+    assert not (repo / ".setpoint").exists()
+    assert ".setpoint" in capsys.readouterr().out
+
+
+def test_migrate_applies(tmp_path):
+    repo = _loom_repo(tmp_path)
+    assert cli.main(["migrate", str(repo)]) == 0
+    assert (repo / ".setpoint" / "one.setpoint.yaml").exists()
+    assert "one.setpoint.yaml" in (repo / ".setpoint" / "fleet.yaml").read_text()
+
+
+def test_migrate_missing_repo_errors(tmp_path):
+    assert cli.main(["migrate", str(tmp_path / "nope")]) == 1
+
+
+def test_migrate_requires_a_path(capsys):
+    assert cli.main(["migrate"]) == 1
+
+
+def test_migrate_on_clean_repo_is_a_noop(tmp_path, capsys):
+    repo = tmp_path / "clean"
+    repo.mkdir()
+    assert cli.main(["migrate", str(repo)]) == 0
+    assert "nothing to migrate" in capsys.readouterr().out
+
+
+def test_migrate_blocked_when_setpoint_dir_already_exists(tmp_path, capsys):
+    repo = _loom_repo(tmp_path)
+    (repo / ".setpoint").mkdir()
+    assert cli.main(["migrate", str(repo)]) == 1
+    out = capsys.readouterr().out
+    assert "REFUSING" in out
+    assert ".setpoint/ already exists" in out
+    # filesystem must be untouched: nothing renamed, no apply happened
+    assert (repo / ".loom" / "one.loom.yaml").exists()
+    assert (repo / ".loom" / "fleet.yaml").read_text() == "name: f\nmembers:\n  - one.loom.yaml\n"
+    assert list((repo / ".setpoint").iterdir()) == []

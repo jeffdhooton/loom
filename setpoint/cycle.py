@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from loom.budget import Budget, Usage
-from loom.memory import IterRecord, Memory, RunState
-from loom.tools import build_registry
+from setpoint.budget import Budget, Usage
+from setpoint.memory import IterRecord, Memory, RunState
+from setpoint.retry import with_retries
+from setpoint.tools import build_registry
+
+_CUTOFF_NOTE = """
+NOTE: the previous EXECUTE stage was cut off ({reason}) before the agent
+finished. The verify failure above may be unfinished work rather than a wrong
+approach — plan a SMALLER step this iteration so it can complete.
+"""
 
 _PLAN_PROMPT = """You are the PLAN stage of a closed loop.
 Goal: {goal}
@@ -48,13 +55,15 @@ class Cycle:
     def _plan(self, context: str, last: IterRecord | None) -> tuple[str, Usage]:
         verdict = "failed" if last and not last.passed else "has not run yet"
         feedback_block = f"Failure feedback:\n{last.feedback}\n" if last and not last.passed else ""
+        if last is not None and last.stop_reason != "done":
+            feedback_block += _CUTOFF_NOTE.format(reason=last.stop_reason)
         prompt = _PLAN_PROMPT.format(
             goal=self.spec.goal, context=context,
             verdict=verdict, feedback_block=feedback_block)
-        resp = self.plan_client.chat.completions.create(
+        resp = with_retries(lambda: self.plan_client.chat.completions.create(
             model=self.spec.execute.plan_model,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
         u = resp.usage
         usage = Usage(getattr(u, "prompt_tokens", 0) or 0,
                       getattr(u, "completion_tokens", 0) or 0,
@@ -127,7 +136,8 @@ class Cycle:
                         + result.usage.cost(self.spec.execute.model, self.budget.pricing))
             rec = IterRecord(n=n, plan=plan, summary=result.text,
                              passed=gate_result.passed, feedback=gate_result.feedback,
-                             usd=iter_usd, score=gate_result.score)
+                             usd=iter_usd, score=gate_result.score,
+                             stop_reason=getattr(result, "stop_reason", "done"))
             self.memory.append(rec)
 
             # ITERATE

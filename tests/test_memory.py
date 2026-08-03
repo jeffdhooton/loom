@@ -1,4 +1,4 @@
-from loom.memory import Memory, IterRecord, RunState
+from setpoint.memory import Memory, IterRecord, RunState
 
 
 def test_append_load_roundtrip(tmp_path):

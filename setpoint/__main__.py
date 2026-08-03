@@ -4,43 +4,43 @@ import os
 import sys
 from pathlib import Path
 
-from loom.clients import make_deepseek_client
+from setpoint.clients import make_deepseek_client
 
 
 def _runs_root() -> Path:
-    return Path(os.environ.get("LOOM_RUNS_ROOT", str(Path.home() / ".loom" / "runs")))
+    return Path(os.environ.get("SETPOINT_RUNS_ROOT", str(Path.home() / ".setpoint" / "runs")))
 
 
 def _build_executor(spec):
     engine = spec.execute.engine
     if engine == "claude":
-        from loom.executor import ClaudeExecutor
+        from setpoint.executor import ClaudeExecutor
         return ClaudeExecutor()
     if engine == "codex":
-        from loom.executor import CodexExecutor
+        from setpoint.executor import CodexExecutor
         return CodexExecutor()
-    from loom.clients import make_deepseek_client
-    from loom.executor import DeepSeekExecutor
-    from loom.budget import PRICING
+    from setpoint.clients import make_deepseek_client
+    from setpoint.executor import DeepSeekExecutor
+    from setpoint.budget import PRICING
     return DeepSeekExecutor(client=make_deepseek_client(), pricing=PRICING)
 
 
 def _build_plan_client(spec):
     if spec.execute.engine in ("claude", "codex"):
-        from loom.executor.agent_plan import AgentPlanClient
+        from setpoint.executor.agent_plan import AgentPlanClient
         return AgentPlanClient()
-    from loom.clients import make_deepseek_client
+    from setpoint.clients import make_deepseek_client
     return make_deepseek_client()
 
 
 def run_loop(spec, *, fresh: bool = False, ui=None, abort_check=None):
-    from loom.workspace import prepare_workspace
-    from loom.budget import Budget, PRICING
-    from loom.memory import Memory
-    from loom.gates import build_gate
-    from loom.clients import make_judge_client
-    from loom.ui import StreamUI
-    from loom.cycle import Cycle
+    from setpoint.workspace import prepare_workspace
+    from setpoint.budget import Budget, PRICING
+    from setpoint.memory import Memory
+    from setpoint.gates import build_gate
+    from setpoint.clients import make_judge_client
+    from setpoint.ui import StreamUI
+    from setpoint.cycle import Cycle
 
     memory = Memory(spec.name, root=_runs_root())
     if fresh:
@@ -69,7 +69,7 @@ def run_loop(spec, *, fresh: bool = False, ui=None, abort_check=None):
         # deliver() must run while `cwd` still exists — a worktree cwd is
         # removed by wt.cleanup() below, so this has to happen inside the try.
         if getattr(spec, "deliver", None):
-            from loom.deliver import deliver as _deliver
+            from setpoint.deliver import deliver as _deliver
             # report_dir=memory.root: for `worktree: true` runs, cwd is a temp
             # worktree removed by wt.cleanup() in this finally block, so a
             # failure-path report.md must land somewhere durable instead.
@@ -86,7 +86,7 @@ def run_loop(spec, *, fresh: bool = False, ui=None, abort_check=None):
 
 
 def cmd_run(spec_path: str, fresh: bool = False) -> int:
-    from loom.spec import load_spec
+    from setpoint.spec import load_spec
     spec = load_spec(spec_path)
     state = run_loop(spec, fresh=fresh)
     return 0 if state.status == "passed" else 2
@@ -116,10 +116,28 @@ def cmd_logs(name: str) -> int:
     return 0
 
 
+def cmd_migrate(repo: str, dry_run: bool = False) -> int:
+    from setpoint.migrate import apply_migration, plan_migration, render_plan
+
+    root = Path(repo).expanduser()
+    if not root.is_dir():
+        print(f"migrate: no such directory: {root}", file=sys.stderr)
+        return 1
+
+    plan = plan_migration(root)
+    print(render_plan(plan))
+    if plan.is_blocked:
+        return 1
+    if dry_run or plan.is_empty:
+        return 0
+    apply_migration(plan)
+    return 0
+
+
 def cmd_fleet(rest: list[str]) -> int:
-    from loom import fleet
+    from setpoint import fleet
     if not rest:
-        print("fleet: usage: loom fleet {run <fleet.yaml> [--fresh] | status <fleet.yaml> | stop}",
+        print("fleet: usage: setpoint fleet {run <fleet.yaml> [--fresh] | status <fleet.yaml> | stop}",
               file=sys.stderr)
         return 1
     sub, args = rest[0], rest[1:]
@@ -151,9 +169,9 @@ def main(argv: list[str] | None = None) -> int:
         pass
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] in ("-h", "--help"):
-        print("loom — DISCOVER->PLAN->EXECUTE->VERIFY->ITERATE loop engine")
-        print("usage: loom {run <spec.yaml> [--fresh] | resume <spec.yaml> | ls | logs <name> | "
-              "fleet run|status|stop}")
+        print("setpoint — DISCOVER->PLAN->EXECUTE->VERIFY->ITERATE loop engine")
+        print("usage: setpoint {run <spec.yaml> [--fresh] | resume <spec.yaml> | ls | "
+              "logs <name> | migrate <repo> [--dry-run] | fleet run|status|stop}")
         return 0
 
     cmd, rest = argv[0], argv[1:]
@@ -169,6 +187,11 @@ def main(argv: list[str] | None = None) -> int:
             print("logs: missing run name", file=sys.stderr)
             return 1
         return cmd_logs(rest[0])
+    if cmd == "migrate":
+        if not rest:
+            print("migrate: missing repo path", file=sys.stderr)
+            return 1
+        return cmd_migrate(rest[0], dry_run=("--dry-run" in rest))
     if cmd == "fleet":
         return cmd_fleet(rest)
     print(f"unknown command: {cmd}", file=sys.stderr)

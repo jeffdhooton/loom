@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: examples/stress-feature-sandbox
   worktree: true
-  branch: loom/stress-feature
+  branch: setpoint/stress-feature
 context:
   notes: |
     Implement the three functions in romans.py (currently NotImplementedError stubs).

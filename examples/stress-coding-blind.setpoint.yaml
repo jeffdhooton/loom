@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: examples/stress-blind-sandbox
   worktree: true
-  branch: loom/stress-blind
+  branch: setpoint/stress-blind
 context:
   notes: |
     mathlib.py contains several independent bugs across add, is_even, factorial,

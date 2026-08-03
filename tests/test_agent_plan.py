@@ -1,4 +1,4 @@
-from loom.executor.agent_plan import AgentPlanClient
+from setpoint.executor.agent_plan import AgentPlanClient
 
 
 def test_agent_plan_client_returns_zero_usage_plan():

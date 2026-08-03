@@ -1,12 +1,12 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from loom.cycle import Cycle
-from loom.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
-from loom.budget import Budget, Usage, PRICING
-from loom.memory import Memory
-from loom.gates import GateResult
-from loom.executor.base import ExecuteResult
+from setpoint.cycle import Cycle
+from setpoint.spec import LoopSpec, Workspace, Context, ExecuteCfg, VerifyCfg, StopCfg, BudgetCfg
+from setpoint.budget import Budget, Usage, PRICING
+from setpoint.memory import Memory
+from setpoint.gates import GateResult
+from setpoint.executor.base import ExecuteResult
 
 
 class StubUI:
@@ -113,19 +113,19 @@ def test_cycle_no_progress_bailout(tmp_path):
 def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
     # A cycle whose abort_check() is True stops immediately with status "stopped".
     from types import SimpleNamespace
-    from loom.cycle import Cycle
-    from loom.memory import Memory
-    from loom.budget import Budget, PRICING
+    from setpoint.cycle import Cycle
+    from setpoint.memory import Memory
+    from setpoint.budget import Budget, PRICING
 
     class _Gate:
         def verify(self, cwd, on_event):  # never reached
-            from loom.gates import GateResult
+            from setpoint.gates import GateResult
             return GateResult(passed=True, feedback="", score=1.0)
 
     class _Exec:
         def execute(self, **kw):
-            from loom.budget import Usage
-            from loom.executor.base import ExecuteResult
+            from setpoint.budget import Usage
+            from setpoint.executor.base import ExecuteResult
             return ExecuteResult(text="", usage=Usage(), steps=[])
 
     class _UI:
@@ -143,7 +143,7 @@ def test_cycle_aborts_when_abort_check_true(tmp_path, monkeypatch):
         stop=SimpleNamespace(max_iters=5, no_progress_after=None),
         workspace=SimpleNamespace(repo=tmp_path),
     )
-    from loom.executor.agent_plan import AgentPlanClient
+    from setpoint.executor.agent_plan import AgentPlanClient
     mem = Memory("ab", root=tmp_path / "runs")
     budget = Budget(None, None, PRICING)
     cyc = Cycle(spec, _Exec(), _Gate(), mem, budget, _UI(), AgentPlanClient(),
@@ -218,6 +218,85 @@ def test_preflight_cold_feedback_seeds_first_plan(tmp_path):
     state = cyc.run(cwd=tmp_path)
     assert state.status == "passed"
     assert "ECONNREFUSED" in prompts[0]  # iter-1 plan already sees the cold failure
+
+
+def test_cutoff_executor_warns_the_next_plan(tmp_path):
+    # An EXECUTE that ran out of tool turns leaves half-finished work. The next
+    # PLAN must be told, or it reads the gate failure as "wrong approach" and
+    # rewrites working code.
+    prompts = []
+
+    def create(**kw):
+        prompts.append(kw["messages"][0]["content"])
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="plan"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1,
+                                  prompt_cache_hit_tokens=0))
+
+    plan_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+    class CutOffExecutor(FakeExecutor):
+        def execute(self, system, task, tools, model, cwd, on_event):
+            self.calls += 1
+            return ExecuteResult(text="[hit max tool turns]", usage=self.usage_per,
+                                 stop_reason="max_turns")
+
+    mem = Memory("t", root=tmp_path / "r")
+    state = Cycle(_spec(tmp_path, max_iters=2), CutOffExecutor(),
+                  FakeGate(pass_on_iter=99), mem,
+                  Budget(10.0, None, PRICING), StubUI(), plan_client).run(cwd=tmp_path)
+
+    assert "cut off" in prompts[1].lower()      # iter 2's plan sees it
+    assert "max_turns" in prompts[1]
+    assert "cut off" not in prompts[0].lower()  # iter 1 had no prior iteration
+    assert state.iters[0].stop_reason == "max_turns"  # and it persists to state.json
+
+
+def test_clean_executor_adds_no_cutoff_note(tmp_path):
+    prompts = []
+
+    def create(**kw):
+        prompts.append(kw["messages"][0]["content"])
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="plan"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1,
+                                  prompt_cache_hit_tokens=0))
+
+    plan_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    Cycle(_spec(tmp_path, max_iters=2), FakeExecutor(), FakeGate(pass_on_iter=99),
+          Memory("t", root=tmp_path / "r"), Budget(10.0, None, PRICING),
+          StubUI(), plan_client).run(cwd=tmp_path)
+    assert all("cut off" not in p.lower() for p in prompts)
+
+
+def test_cycle_retries_transient_plan_errors(tmp_path, monkeypatch):
+    from setpoint import retry
+    monkeypatch.setattr(retry, "_sleep", lambda s: None)
+
+    class Transient(Exception):
+        status_code = 503
+
+    attempts = []
+
+    def create(**kw):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise Transient()
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="plan"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1,
+                                  prompt_cache_hit_tokens=0))
+
+    plan_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    state = Cycle(_spec(tmp_path, max_iters=1), FakeExecutor(), FakeGate(pass_on_iter=1),
+                  Memory("t", root=tmp_path / "r"), Budget(10.0, None, PRICING),
+                  StubUI(), plan_client).run(cwd=tmp_path)
+
+    assert state.status == "passed"  # a 503 blip no longer kills the run
+    assert len(attempts) == 3
 
 
 def test_cycle_passes_wall_clock_deadline_to_executor(tmp_path):

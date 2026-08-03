@@ -6,9 +6,9 @@ import threading
 import traceback
 from pathlib import Path
 
-from loom.__main__ import _runs_root, run_loop as _default_run_loop
-from loom.fleet_spec import load_fleet
-from loom.ui import NullUI
+from setpoint.__main__ import _runs_root, run_loop as _default_run_loop
+from setpoint.fleet_spec import load_fleet
+from setpoint.ui import NullUI
 
 
 def stop_sentinel_path() -> Path:
@@ -17,15 +17,23 @@ def stop_sentinel_path() -> Path:
 
 def _member_name(member_path: Path) -> str:
     # Fallback when the spec can't be loaded: member paths look like
-    # ".../<name>.loom.yaml"; strip both suffixes.
-    return member_path.stem.replace(".loom", "")
+    # ".../<name>.setpoint.yaml". Accept the legacy ".loom" suffix too, so an
+    # un-migrated fleet still resolves its run keys. removesuffix, not replace:
+    # a run named "deploy.loomtest" must not be mangled to "deploytest".
+    # DEPRECATED: drop the ".loom" entry in the same release that removes the
+    # ".loom.yaml" branch in spec.py:load_spec — they are one compat surface.
+    stem = member_path.stem
+    for suffix in (".setpoint", ".loom"):
+        if stem.endswith(suffix):
+            return stem.removesuffix(suffix)
+    return stem
 
 
 def _run_name(member_path: Path) -> str:
     """Resolve the run-lookup key for a member: the spec's declared `name:`
-    field (that's what `Memory` keys `~/.loom/runs/<name>/` by), falling
+    field (that's what `Memory` keys `~/.setpoint/runs/<name>/` by), falling
     back to the filename stem if the spec can't be loaded."""
-    from loom.spec import load_spec
+    from setpoint.spec import load_spec
 
     try:
         return load_spec(str(member_path)).name
@@ -34,13 +42,13 @@ def _run_name(member_path: Path) -> str:
 
 
 def _run_member(member_path: Path, fresh: bool, run_loop) -> tuple[str, str]:
-    from loom.spec import load_spec
+    from setpoint.spec import load_spec
 
     sentinel = stop_sentinel_path()
     try:
         spec = load_spec(str(member_path))
     except Exception:
-        print(f"loom fleet: member {member_path.name} failed to load:\n{traceback.format_exc()}",
+        print(f"setpoint fleet: member {member_path.name} failed to load:\n{traceback.format_exc()}",
               file=sys.stderr)
         return _member_name(member_path), "error"
     try:
@@ -48,7 +56,7 @@ def _run_member(member_path: Path, fresh: bool, run_loop) -> tuple[str, str]:
                           abort_check=lambda: sentinel.exists())
         return spec.name, getattr(state, "status", "error")
     except Exception:
-        print(f"loom fleet: member {spec.name} failed:\n{traceback.format_exc()}",
+        print(f"setpoint fleet: member {spec.name} failed:\n{traceback.format_exc()}",
               file=sys.stderr)
         return spec.name, "error"
 
@@ -69,7 +77,7 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
     run_loop = run_loop or _default_run_loop
     fs = load_fleet(fleet_path)
 
-    # Each member's run state lives at ~/.loom/runs/<run-name>/. If two
+    # Each member's run state lives at ~/.setpoint/runs/<run-name>/. If two
     # members resolve to the same run name, they'd race the same
     # state.json/log.md (and --fresh could rmtree one mid-run) -- fail fast
     # before submitting any work.
@@ -124,7 +132,7 @@ def run_fleet(fleet_path: str, *, fresh: bool = False, run_loop=None) -> dict[st
             results[name] = status
 
     if skipped:
-        print(f"loom fleet: STOP sentinel detected — skipped {skipped} unstarted member(s)")
+        print(f"setpoint fleet: STOP sentinel detected — skipped {skipped} unstarted member(s)")
 
     return results
 

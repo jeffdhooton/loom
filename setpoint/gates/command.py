@@ -6,18 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from setpoint.clip import clip
 from . import Gate, GateResult
-
-_MAX = 6000
-_HEAD = 1500  # test runners print failures LAST — bias the kept window to the tail
-
-
-def _clip(out: str) -> str:
-    if len(out) <= _MAX:
-        return out
-    tail = _MAX - _HEAD
-    dropped = len(out) - _MAX
-    return out[:_HEAD] + f"\n…[{dropped} chars truncated]…\n" + out[-tail:]
 
 
 class CommandGate(Gate):
@@ -47,7 +37,7 @@ class CommandGate(Gate):
             except (ProcessLookupError, PermissionError):
                 pass
             stdout, stderr = proc.communicate()
-        out = _clip(((stdout or "") + (stderr or "")).strip())
+        out = clip(((stdout or "") + (stderr or "")).strip())
         if timed_out:
             feedback = (f"verify command timed out after {self.timeout}s "
                         "(hung, or left a background process holding its output pipe)")

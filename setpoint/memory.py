@@ -14,6 +14,9 @@ class IterRecord:
     feedback: str
     usd: float
     score: float | None = None
+    # "done", or why EXECUTE was cut off ("max_turns", "timeout"). Defaulted so
+    # state.json written before this field existed still loads.
+    stop_reason: str = "done"
 
 
 @dataclass
@@ -27,7 +30,7 @@ class RunState:
 class Memory:
     def __init__(self, name: str, root: Path | None = None):
         self.name = name
-        self.root = (root or (Path.home() / ".loom" / "runs")) / name
+        self.root = (root or (Path.home() / ".setpoint" / "runs")) / name
         self.state_path = self.root / "state.json"
         self.log_path = self.root / "log.md"
 
@@ -69,6 +72,8 @@ class Memory:
         lines = ["## Loop history (memory spine)"]
         for r in state.iters:
             verdict = "PASS" if r.passed else "FAIL"
+            if r.stop_reason != "done":
+                verdict += f", EXECUTE cut off: {r.stop_reason}"
             lines.append(f"- iteration {r.n} [{verdict}]: {r.summary}")
             if not r.passed and r.feedback:
                 lines.append(f"  feedback: {r.feedback}")
@@ -82,6 +87,8 @@ class Memory:
 
     def _append_log(self, rec: IterRecord) -> None:
         verdict = "✅ PASS" if rec.passed else "❌ FAIL"
+        if rec.stop_reason != "done":
+            verdict += f" ⚠️ EXECUTE cut off: {rec.stop_reason}"
         block = (
             f"\n## Iteration {rec.n} — {verdict} (${rec.usd:.4f})\n\n"
             f"**Plan:** {rec.plan}\n\n"

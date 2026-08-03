@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from loom.budget import Usage
-from loom.tools import Tool
+from setpoint.budget import Usage
+from setpoint.tools import Tool
 
 
 @dataclass
@@ -20,6 +20,11 @@ class ExecuteResult:
     text: str
     usage: Usage
     steps: list[dict] = field(default_factory=list)
+    # "done" = the agent finished on its own terms. Anything else means EXECUTE
+    # was cut off mid-work ("max_turns", "timeout", ...), so the VERIFY failure
+    # that follows may be unfinished work rather than a wrong approach — the
+    # next PLAN is told the difference.
+    stop_reason: str = "done"
 
 
 class Executor(abc.ABC):

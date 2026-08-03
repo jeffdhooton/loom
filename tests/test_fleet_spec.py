@@ -6,27 +6,27 @@ import pytest
 
 
 def test_load_fleet_parses_members_and_concurrency(tmp_path):
-    from loom.fleet_spec import load_fleet
-    (tmp_path / "a.loom.yaml").write_text("x")
-    (tmp_path / "b.loom.yaml").write_text("x")
+    from setpoint.fleet_spec import load_fleet
+    (tmp_path / "a.setpoint.yaml").write_text("x")
+    (tmp_path / "b.setpoint.yaml").write_text("x")
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: prebeta\nconcurrency: 2\nmembers:\n  - a.loom.yaml\n  - b.loom.yaml\n")
+    fp.write_text("name: prebeta\nconcurrency: 2\nmembers:\n  - a.setpoint.yaml\n  - b.setpoint.yaml\n")
     fs = load_fleet(str(fp))
     assert fs.name == "prebeta"
     assert fs.concurrency == 2
-    assert [p.name for p in fs.members] == ["a.loom.yaml", "b.loom.yaml"]
+    assert [p.name for p in fs.members] == ["a.setpoint.yaml", "b.setpoint.yaml"]
     assert all(p.is_absolute() for p in fs.members)  # resolved relative to fleet dir
 
 
 def test_load_fleet_defaults_concurrency_4(tmp_path):
-    from loom.fleet_spec import load_fleet
+    from setpoint.fleet_spec import load_fleet
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: f\nmembers:\n  - a.loom.yaml\n")
+    fp.write_text("name: f\nmembers:\n  - a.setpoint.yaml\n")
     assert load_fleet(str(fp)).concurrency == 4
 
 
 def test_load_fleet_requires_members(tmp_path):
-    from loom.fleet_spec import load_fleet
+    from setpoint.fleet_spec import load_fleet
     fp = tmp_path / "fleet.yaml"
     fp.write_text("name: f\nmembers: []\n")
     with pytest.raises(ValueError, match="members"):
@@ -34,23 +34,23 @@ def test_load_fleet_requires_members(tmp_path):
 
 
 def test_load_fleet_rejects_zero_concurrency(tmp_path):
-    from loom.fleet_spec import load_fleet
+    from setpoint.fleet_spec import load_fleet
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: f\nconcurrency: 0\nmembers:\n  - a.loom.yaml\n")
+    fp.write_text("name: f\nconcurrency: 0\nmembers:\n  - a.setpoint.yaml\n")
     with pytest.raises(ValueError, match="concurrency"):
         load_fleet(str(fp))
 
 
 def test_load_fleet_rejects_negative_concurrency(tmp_path):
-    from loom.fleet_spec import load_fleet
+    from setpoint.fleet_spec import load_fleet
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: f\nconcurrency: -1\nmembers:\n  - a.loom.yaml\n")
+    fp.write_text("name: f\nconcurrency: -1\nmembers:\n  - a.setpoint.yaml\n")
     with pytest.raises(ValueError, match="concurrency"):
         load_fleet(str(fp))
 
 
 def test_load_fleet_null_concurrency_defaults_to_4(tmp_path):
-    from loom.fleet_spec import load_fleet
+    from setpoint.fleet_spec import load_fleet
     fp = tmp_path / "fleet.yaml"
-    fp.write_text("name: f\nconcurrency:\nmembers:\n  - a.loom.yaml\n")
+    fp.write_text("name: f\nconcurrency:\nmembers:\n  - a.setpoint.yaml\n")
     assert load_fleet(str(fp)).concurrency == 4

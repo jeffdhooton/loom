@@ -1,7 +1,7 @@
-from loom.ui import StreamUI
-from loom.budget import Budget, PRICING
-from loom.memory import RunState, IterRecord
-from loom.gates import GateResult
+from setpoint.ui import StreamUI
+from setpoint.budget import Budget, PRICING
+from setpoint.memory import RunState, IterRecord
+from setpoint.gates import GateResult
 
 
 def test_ui_renders_without_error(capsys):
@@ -21,7 +21,7 @@ def test_ui_renders_without_error(capsys):
 
 
 def test_null_ui_is_silent(capsys):
-    from loom.ui import NullUI
+    from setpoint.ui import NullUI
     ui = NullUI()
     ui.header()
     ui.stage("EXECUTE", 1, 3)

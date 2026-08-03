@@ -1,4 +1,4 @@
-from loom.gates.checks import run_checks
+from setpoint.gates.checks import run_checks
 
 
 def _passed(results):
@@ -39,7 +39,7 @@ def test_contain_checks_accept_bare_strings():
 
 def test_judge_diff_uses_merge_base_when_maker_committed(tmp_path):
     import subprocess
-    from loom.gates.judge import JudgeGate
+    from setpoint.gates.judge import JudgeGate
 
     def git(*args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)

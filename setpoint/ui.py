@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from loom.budget import Budget
-from loom.gates import GateResult
-from loom.memory import RunState
+from setpoint.budget import Budget
+from setpoint.gates import GateResult
+from setpoint.memory import RunState
 
 
 class StreamUI:
@@ -21,7 +21,7 @@ class StreamUI:
         return s
 
     def header(self, **kw) -> None:
-        self.console.rule(f"[bold]loom ▸ {self.name}[/bold]")
+        self.console.rule(f"[bold]setpoint ▸ {self.name}[/bold]")
 
     def stage(self, name: str, n: int, total: int) -> None:
         warn = " [yellow](budget 80%)[/yellow]" if self.budget.warn() else ""

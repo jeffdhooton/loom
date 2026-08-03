@@ -4,7 +4,7 @@ type: coding
 workspace:
   repo: examples/sandbox
   worktree: true
-  branch: loom/fix-add
+  branch: setpoint/fix-add
 context:
   notes: |
     calc.py has a bug in add(). Fix it so the test passes. Use bash to run pytest.
